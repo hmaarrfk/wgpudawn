@@ -50,7 +50,7 @@
 // two, so that a failure here points at the browser or at Pyodide, and not at
 // this site.
 const $ = (id) => document.getElementById(id);
-const TIMEOUT = 20000;
+const TIMEOUT = 60000;
 
 // Everything the console gets while a test runs is part of its result: Pyodide
 // reports a crash of the interpreter only there.
@@ -74,7 +74,11 @@ window.addEventListener('error', (e) => sink && sink(`[uncaught] ${describe(e.er
 window.addEventListener('unhandledrejection', (e) => sink && sink(`[unhandled rejection] ${describe(e.reason)}`));
 
 const manifest = await fetch('examples.json').then((r) => r.json()).catch(() => null);
-const pyodideUrl = manifest ? manifest.pyodide.url : 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
+// ?pyodide=<url of a directory> tests another build of Pyodide, e.g. one that
+// is served next to this page (?pyodide=pyodide/)
+const asked = new URLSearchParams(location.search).get('pyodide');
+const pyodideUrl = asked ? new URL(asked.replace(/\/?$/, '/'), location.href).href
+  : manifest ? manifest.pyodide.url : 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
 const state = { py: null, dead: false };
 
 const python = (code) => state.py.runPythonAsync(code);
