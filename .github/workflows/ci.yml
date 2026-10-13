@@ -341,18 +341,15 @@ jobs:
         python website/build.py --pygfx pygfx-src --wheels web-wheels --out site
         du -sh site
     - name: Run every example in headless Chrome
-      env:
-        # Software rendering for WebGPU and for putting its canvas on screen;
-        # without the latter the screenshots are black
-        CHROME_FLAGS: --use-angle=swiftshader --use-webgpu-adapter=swiftshader --enable-unsafe-swiftshader
       run: |
         # No GPU here: Chrome's WebGPU runs on SwiftShader. This records which
-        # examples work (results.json) and what they draw (shots/), which is
-        # what the gallery shows, and fails when an example that is known to
-        # work (website/expected.json) does not.
+        # examples work (results.json), which is what the gallery shows, and
+        # fails when an example that is known to work (website/expected.json)
+        # does not. The pictures are those in website/shots: without a GPU,
+        # Chrome leaves a WebGPU canvas black (--keep-shots).
         google-chrome --version
         cd website && npm install --no-audit --no-fund
-        node check.mjs ../site --jobs 4 --timeout 240 --expect expected.json
+        node check.mjs ../site --jobs 4 --timeout 240 --expect expected.json --keep-shots
     - uses: actions/upload-artifact@v4
       if: always()
       with:

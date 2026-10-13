@@ -3,7 +3,7 @@
 // shots/<example>.jpg (what they draw). The gallery shows both.
 //
 //   node website/check.mjs <site-dir> [--only <substring>] [--failed] [--jobs N] [--timeout S]
-//       [--expect <file>] [--write-expected <file>]
+//       [--expect <file>] [--write-expected <file>] [--keep-shots]
 //
 // Env: CHROME_PATH (default: /usr/bin/google-chrome), CHROME_FLAGS (extra
 // flags, e.g. "--use-angle=vulkan --ignore-gpu-blocklist" for a hardware GPU).
@@ -29,7 +29,12 @@ const timeout = Number(option('--timeout', '180')) * 1000;
 // A JPEG of one flat color is about 0.0073 bytes per pixel (4.2 kB at 960x600);
 // a dark scene with a few thin lines is already over 0.0082
 const BLANK_BYTES_PER_PIXEL = 0.0077;
-const failedOnly = args.includes('--failed');  // only what did not work last time
+const failedOnly = args.includes('--failed');
+// Headless Chrome without a GPU (CI) runs WebGPU in software, but its canvas
+// stays black, on screen and when read back. There, keep the pictures that the
+// site already has (website/shots, taken on a machine with a GPU) and only
+// record what works.
+const keepShots = args.includes('--keep-shots');  // only what did not work last time
 
 const types = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
@@ -80,8 +85,10 @@ async function checkExample(browser, example) {
       .catch((e) => done({ ok: false, error: String(e) }));
   });
   const result = { ok: outcome.ok, seconds: Math.round((Date.now() - started) / 100) / 10 };
-  if (outcome.ok) {
-    const shot = path.join(dir, 'shots', example.id + '.jpg');
+  const shot = path.join(dir, 'shots', example.id + '.jpg');
+  if (outcome.ok && keepShots) {
+    if (fs.existsSync(shot)) result.shot = `shots/${example.id}.jpg`;
+  } else if (outcome.ok) {
     fs.mkdirSync(path.dirname(shot), { recursive: true });
     try {
       const canvas = await tab.$('#canvas');
@@ -138,15 +145,17 @@ async function worker() {
 }
 await Promise.all(Array.from({ length: jobs }, worker));
 
-// A timeout can be the machine (software rendering, several browsers at once)
-// rather than the example: try those once more, one at a time
-const timedOut = manifest.examples.filter((e) => results[e.id] && results[e.id].error === 'timeout');
-if (timedOut.length) {
-  console.log(`Trying ${timedOut.length} examples that timed out once more, one at a time`);
-  queue.push(...timedOut);
+// A timeout or a lost device can be the machine (software rendering, several
+// browsers at once: the GPU process of Chrome gives up) rather than the
+// example: try those once more, one at a time
+const transient = (result) => result && !result.ok &&
+  (result.error === 'timeout' || /device was lost|did not respond/i.test(result.error));
+const again = manifest.examples.filter((e) => transient(results[e.id]));
+if (again.length) {
+  console.log(`Trying ${again.length} examples with a transient failure once more, one at a time`);
+  queue.push(...again);
   await worker();
 }
-server.close();
 
 const counts = { ok: 0, failed: 0, blank: 0, skipped: manifest.examples.filter((e) => e.skip).length };
 for (const example of manifest.examples) {
@@ -164,9 +173,9 @@ const writeExpected = option('--write-expected', '');
 if (writeExpected) fs.writeFileSync(writeExpected, JSON.stringify(working, null, 1) + '\n');
 
 // When most pictures are flat, it is not the examples: this browser does not put
-// the WebGPU canvas on screen (headless Chrome without a GPU needs
-// --use-angle=swiftshader), and the gallery would be all black
-if (counts.blank > 0.2 * counts.ok) {
+// the WebGPU canvas on screen (headless Chrome without a GPU: use --keep-shots
+// there), and the gallery would be all black
+if (!keepShots && counts.blank > 0.2 * counts.ok) {
   console.log(`${counts.blank} of ${counts.ok} screenshots are blank: the browser is not showing the canvas.`);
   process.exit(1);
 }

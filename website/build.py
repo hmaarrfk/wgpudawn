@@ -252,6 +252,12 @@ def main():
         shutil.copy(os.path.join(HERE, name), os.path.join(out, name))
     open(os.path.join(out, ".nojekyll"), "w").close()
 
+    # The pictures of the gallery: taken by check.mjs on a machine with a GPU,
+    # and kept in the repository, because CI has no GPU to take them with
+    shots = os.path.join(HERE, "shots")
+    if os.path.isdir(shots):
+        shutil.copytree(shots, os.path.join(out, "shots"), dirs_exist_ok=True)
+
     # Wheels: the newest of each
     wheels = {}
     for name in sorted(os.listdir(args.wheels)):

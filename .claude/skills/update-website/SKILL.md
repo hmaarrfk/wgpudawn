@@ -125,6 +125,16 @@ Then refresh the baseline with what works now:
 `node website/check.mjs ../site --failed --write-expected website/expected.json`
 (review the diff: it should only grow, apart from the cases above).
 
+The pictures of the gallery are the ones this run took (`../site/shots`), and
+they are kept in the repository, because CI has no GPU: there Chrome runs the
+examples in software but leaves a WebGPU canvas black, so CI only records what
+works (`--keep-shots`). After a check on a machine with a GPU, on its GPU
+(`CHROME_FLAGS` as above, never the software mode), update them:
+
+```sh
+rsync -a --delete ../site/shots/ website/shots/
+```
+
 ## 4. Look at it
 
 Open the gallery and a few example pages in a browser, or take screenshots
