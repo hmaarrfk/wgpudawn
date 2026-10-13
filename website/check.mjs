@@ -137,6 +137,15 @@ async function worker() {
   await browser.close();
 }
 await Promise.all(Array.from({ length: jobs }, worker));
+
+// A timeout can be the machine (software rendering, several browsers at once)
+// rather than the example: try those once more, one at a time
+const timedOut = manifest.examples.filter((e) => results[e.id] && results[e.id].error === 'timeout');
+if (timedOut.length) {
+  console.log(`Trying ${timedOut.length} examples that timed out once more, one at a time`);
+  queue.push(...timedOut);
+  await worker();
+}
 server.close();
 
 const counts = { ok: 0, failed: 0, blank: 0, skipped: manifest.examples.filter((e) => e.skip).length };
@@ -153,6 +162,14 @@ console.log(`${counts.ok} ok (${counts.blank} of them drew nothing visible), ${c
 const working = Object.keys(results).filter((id) => results[id].ok).sort();
 const writeExpected = option('--write-expected', '');
 if (writeExpected) fs.writeFileSync(writeExpected, JSON.stringify(working, null, 1) + '\n');
+
+// When most pictures are flat, it is not the examples: this browser does not put
+// the WebGPU canvas on screen (headless Chrome without a GPU needs
+// --use-angle=swiftshader), and the gallery would be all black
+if (counts.blank > 0.2 * counts.ok) {
+  console.log(`${counts.blank} of ${counts.ok} screenshots are blank: the browser is not showing the canvas.`);
+  process.exit(1);
+}
 
 const regressions = expected.filter((id) => results[id] && !results[id].ok);
 const fixed = working.filter((id) => expectFile && !expected.includes(id));
