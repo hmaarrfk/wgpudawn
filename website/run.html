@@ -114,6 +114,7 @@
       It runs in this page on Dawn's WebGPU through <a class="link" href="https://github.com/hmaarrfk/wgpudawn" target="_blank" rel="noopener">wgpudawn</a>,
       a Dawn reference implementation that follows the architecture and design of <a class="link" href="https://github.com/pygfx/wgpu-py" target="_blank" rel="noopener">wgpu-py</a>, maintained by AI agents.
       Needs WebGPU, and JSPI for the blocking parts of the API: recent Chrome or Edge.
+      Not working here? <a class="link" href="diagnose.html">Test this browser</a>.
     </p>
   </div>
 </footer>
@@ -302,7 +303,7 @@ function log(text, kind) {
   if (check || logged <= LOG_LINES) {
     const line = document.createElement('span');
     line.textContent = text + '\n';
-    if (kind === 'err') line.className = 'err';
+    if (kind === 'err' || kind === 'console') line.className = 'err';
     $('log').append(line);
     if ($('log-pane').hidden) $('log-dot').hidden = false;
   } else if (logged === LOG_LINES + 1) {

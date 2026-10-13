@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test this browser - wgpudawn</title>
+<link rel="icon" href="logo.svg">
+<link rel="stylesheet" href="site.css">
+<style>
+  .diag { max-width: 860px; margin: 0 auto; padding: 28px 20px 80px; }
+  .diag h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); margin: 18px 0 8px; }
+  .diag p { line-height: 1.55; }
+  .steps { list-style: none; padding: 0; margin: 24px 0; display: grid; gap: 8px; }
+  .steps li { border: 1px solid var(--line, #8884); border-radius: 10px; padding: 10px 14px; }
+  .steps .head { display: flex; gap: 10px; align-items: baseline; }
+  .steps .state { font: 600 12px/1 ui-monospace, monospace; letter-spacing: .06em; min-width: 5.5em; }
+  .steps .ok .state { color: #2e9f5b; }
+  .steps .fail .state { color: #d9483b; }
+  .steps .busy .state { color: var(--accent, #f28c28); }
+  .steps .skip .state { opacity: .55; }
+  .steps .name { font-weight: 600; }
+  .steps .what { opacity: .7; font-size: .92em; }
+  .steps pre { margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.45; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
+  .actions button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line, #8884); background: transparent; color: inherit; cursor: pointer; }
+  .actions button.primary { background: var(--accent, #f28c28); color: #fff; border-color: transparent; font-weight: 600; }
+  #report { width: 100%; min-height: 220px; font: 12px/1.45 ui-monospace, monospace; padding: 12px; border-radius: 10px; border: 1px solid var(--line, #8884); background: transparent; color: inherit; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<main class="diag">
+  <a class="brand" href="./">wgpudawn <span>gallery</span></a>
+  <h1>Test this browser</h1>
+  <p>
+    The examples need three things from a browser: WebGPU, Pyodide (Python compiled to
+    WebAssembly), and JSPI (WebAssembly stack switching), which lets Python wait for the
+    browser. This page tries each of them separately, smallest first, and says where it
+    stops. Nothing is sent anywhere: copy the report at the bottom into a bug report.
+  </p>
+  <div class="actions">
+    <button class="primary" id="start">Run the tests</button>
+    <button id="copy" hidden>Copy the report</button>
+  </div>
+  <ol class="steps" id="steps"></ol>
+  <textarea id="report" readonly hidden></textarea>
+</main>
+
+<script type="module">
+// Each test is independent of the gallery's own code (runner.js) up to the last
+// two, so that a failure here points at the browser or at Pyodide, and not at
+// this site.
+const $ = (id) => document.getElementById(id);
+const TIMEOUT = 20000;
+
+// Everything the console gets while a test runs is part of its result: Pyodide
+// reports a crash of the interpreter only there.
+let sink = null;
+const describe = (v) => (v instanceof Error ? (v.stack || `${v.name}: ${v.message}`)
+  : typeof v === 'string' ? v : (() => { try { return JSON.stringify(v); } catch { return String(v); } })());
+for (const name of ['error', 'warn', 'log']) {
+  const original = console[name].bind(console);
+  console[name] = (...values) => {
+    original(...values);
+    if (sink) sink(`[console.${name}] ${values.map(describe).join(' ')}`);
+  };
+}
+window.addEventListener('error', (e) => sink && sink(`[uncaught] ${describe(e.error || e.message)}`));
+window.addEventListener('unhandledrejection', (e) => sink && sink(`[unhandled rejection] ${describe(e.reason)}`));
+
+const manifest = await fetch('examples.json').then((r) => r.json()).catch(() => null);
+const pyodideUrl = manifest ? manifest.pyodide.url : 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
+const state = { py: null, dead: false };
+
+const python = (code) => state.py.runPythonAsync(code);
+
+const TESTS = [
+  ['Browser', 'What this browser says it is', async () => [
+    navigator.userAgent,
+    `screen ${screen.width}x${screen.height} @${window.devicePixelRatio}x, ${navigator.hardwareConcurrency || '?'} cores, ` +
+    `memory ${navigator.deviceMemory || '?'} GB`,
+    `secure context: ${window.isSecureContext}, cross-origin isolated: ${window.crossOriginIsolated}`,
+  ].join('\n')],
+
+  ['WebGPU', 'navigator.gpu, an adapter and a device, from JavaScript', async () => {
+    if (!navigator.gpu) throw new Error('navigator.gpu does not exist: this browser has no WebGPU (or it is switched off).');
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) throw new Error('navigator.gpu.requestAdapter() returned null.');
+    const info = adapter.info || {};
+    const device = await adapter.requestDevice();
+    const lines = [
+      `adapter: vendor=${info.vendor || '?'} architecture=${info.architecture || '?'} device=${info.device || '?'} description=${info.description || '?'}`,
+      `features (${adapter.features.size}): ${[...adapter.features].sort().join(' ')}`,
+      `limits: maxTextureDimension2D=${adapter.limits.maxTextureDimension2D} maxBindGroups=${adapter.limits.maxBindGroups} ` +
+      `maxBufferSize=${adapter.limits.maxBufferSize}`,
+      `preferred canvas format: ${navigator.gpu.getPreferredCanvasFormat()}`,
+    ];
+    device.destroy();
+    return lines.join('\n');
+  }],
+
+  ['JSPI in the browser', 'WebAssembly.Suspending and WebAssembly.promising', async () => {
+    const suspending = typeof WebAssembly.Suspending === 'function';
+    const promising = typeof WebAssembly.promising === 'function';
+    if (!suspending || !promising) {
+      throw new Error(`WebAssembly.Suspending: ${suspending}, WebAssembly.promising: ${promising}. ` +
+        'Without JSPI, Python cannot wait for the browser: the blocking API (most examples) cannot work.');
+    }
+    return 'WebAssembly.Suspending and WebAssembly.promising exist.';
+  }],
+
+  ['JSPI without Pyodide', 'A 60-byte WebAssembly module that suspends on a JavaScript promise', async () => {
+    // (module (import "m" "wait" (func $wait (result i32)))
+    //         (func (export "run") (result i32) call $wait i32.const 1 i32.add))
+    const bytes = new Uint8Array([
+      0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 127, 2, 10, 1, 1, 109, 4, 119, 97, 105, 116, 0, 0,
+      3, 2, 1, 0, 7, 7, 1, 3, 114, 117, 110, 0, 1, 10, 9, 1, 7, 0, 16, 0, 65, 1, 106, 11,
+    ]);
+    const wait = new WebAssembly.Suspending(() => new Promise((resolve) => setTimeout(() => resolve(41), 50)));
+    const { instance } = await WebAssembly.instantiate(bytes, { m: { wait } });
+    const run = WebAssembly.promising(instance.exports.run);
+    const result = await run();
+    if (result !== 42) throw new Error(`Expected 42, got ${result}.`);
+    return 'A WebAssembly function suspended on a promise and resumed: 41 + 1 = 42.';
+  }],
+
+  ['Pyodide loads', pyodideUrl, async (note) => {
+    const { loadPyodide } = await import(pyodideUrl + 'pyodide.mjs');
+    state.py = await loadPyodide({ indexURL: pyodideUrl, stdout: note, stderr: note });
+    return `Pyodide ${state.py.version}; ` + await python('import sys; sys.version');
+  }],
+
+  ['Python runs', 'runPythonAsync with an await (no stack switching)', async () =>
+    'await asyncio.sleep(0.05) returned; 6 * 7 = ' + await python('import asyncio\nawait asyncio.sleep(0.05)\n6 * 7')],
+
+  ['Pyodide says JSPI works', 'pyodide.ffi.can_run_sync() inside runPythonAsync', async () => {
+    const can = await python('from pyodide.ffi import can_run_sync\ncan_run_sync()');
+    if (!can) throw new Error('can_run_sync() is False: Pyodide did not enable stack switching in this browser.');
+    return 'can_run_sync() is True.';
+  }],
+
+  ['Python waits for the browser', 'pyodide.ffi.run_sync(asyncio.sleep(0.1)): the first stack switch', async () =>
+    'run_sync(asyncio.sleep(0.1)) returned: ' + await python(
+      'import asyncio\nfrom pyodide.ffi import run_sync\nrun_sync(asyncio.sleep(0.1))\n"ok"')],
+
+  ['Python waits for a JavaScript promise', 'run_sync on a promise made in JavaScript', async () => {
+    state.py.globals.set('make_promise', () => new Promise((resolve) => setTimeout(() => resolve(7), 100)));
+    return 'run_sync(make_promise()) returned ' + await python('from pyodide.ffi import run_sync\nrun_sync(make_promise())');
+  }],
+
+  ['A package loads while Python waits', 'run_sync(pyodide_js.loadPackage("sniffio")), as the gallery does on import', async () =>
+    'loaded; sniffio ' + await python(
+      'import pyodide_js\nfrom pyodide.ffi import run_sync\nrun_sync(pyodide_js.loadPackage("sniffio"))\n' +
+      'import sniffio\nsniffio.__version__')],
+
+  ['wgpudawn imports', 'The Pyodide wheel of wgpudawn (cffi + Dawn\'s Emdawnwebgpu)', async () => {
+    if (!manifest) throw new Error('examples.json is not here: this page is not part of a built site.');
+    await state.py.loadPackage(['cffi'], { messageCallback: () => {} });
+    const site = state.py.runPython('import site; site.getsitepackages()[0]');
+    const wheel = manifest.wheels.find((name) => name.startsWith('wgpudawn'));
+    const data = new Uint8Array(await (await fetch('wheels/' + encodeURIComponent(wheel))).arrayBuffer());
+    state.py.unpackArchive(data, 'wheel', { extractDir: site });
+    return wheel + '\n' + await python(
+      'import wgpudawn, wgpudawn.backends.dawn as dawn\nf"wgpudawn {wgpudawn.__version__}, Dawn {dawn.__version__}"');
+  }],
+
+  ['wgpudawn: adapter and device, awaited', 'request_adapter_async / request_device_async (no stack switching)', async () =>
+    await python(
+      'import wgpudawn\nadapter = await wgpudawn.gpu.request_adapter_async()\n' +
+      'device = await adapter.request_device_async()\nadapter.summary')],
+
+  ['wgpudawn: adapter and device, blocking', 'request_adapter_sync / request_device_sync (through JSPI)', async () =>
+    await python(
+      'import wgpudawn\nadapter = wgpudawn.gpu.request_adapter_sync()\n' +
+      'device = adapter.request_device_sync()\nadapter.summary')],
+
+  ['wgpudawn computes on the GPU', 'A compute shader squares 16 numbers; the result is read back', async () => {
+    await state.py.loadPackage(['numpy'], { messageCallback: () => {} });
+    return await python(`
+import numpy as np, wgpudawn
+from wgpudawn.utils.compute import compute_with_buffers
+shader = """
+@group(0) @binding(0) var<storage, read> a: array<f32>;
+@group(0) @binding(1) var<storage, read_write> b: array<f32>;
+@compute @workgroup_size(1)
+fn main(@builtin(global_invocation_id) i: vec3<u32>) { b[i.x] = a[i.x] * a[i.x]; }
+"""
+a = np.arange(16, dtype=np.float32)
+out = compute_with_buffers({0: a}, {1: a.nbytes}, shader, n=16)
+b = np.frombuffer(out[1], dtype=np.float32)
+assert np.allclose(b, a * a), b
+"squares of 0..15: " + " ".join(str(int(x)) for x in b)
+`);
+  }],
+];
+
+const report = [];
+function row(name, what) {
+  const li = document.createElement('li');
+  li.className = 'busy';
+  li.innerHTML = '<div class="head"><span class="state">RUNNING</span><span class="name"></span></div><div class="what"></div><pre></pre>';
+  li.querySelector('.name').textContent = name;
+  li.querySelector('.what').textContent = what;
+  $('steps').append(li);
+  return li;
+}
+
+async function run() {
+  $('start').disabled = true;
+  $('steps').textContent = '';
+  report.length = 0;
+  report.push(`wgpudawn browser test, ${new Date().toISOString()}`, location.href, '');
+  for (const [name, what, test] of TESTS) {
+    const li = row(name, what);
+    const pre = li.querySelector('pre');
+    const notes = [];
+    const done = (kind, label, text) => {
+      li.className = kind;
+      li.querySelector('.state').textContent = label;
+      pre.textContent = [text, ...notes].filter(Boolean).join('\n');
+      report.push(`[${label}] ${name} - ${what}`, ...pre.textContent.split('\n').map((line) => '    ' + line), '');
+    };
+    if (state.dead) { done('skip', 'SKIPPED', 'Not run: the Python interpreter crashed in an earlier test.'); continue; }
+    sink = (text) => {
+      notes.push(text);
+      if (/fatal error/i.test(text)) state.dead = true;
+    };
+    const started = performance.now();
+    try {
+      const result = await Promise.race([
+        test((text) => notes.push(text)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(
+          `No answer after ${TIMEOUT / 1000} s: the call never returned` +
+          (state.dead ? ' (the interpreter crashed: see the console messages below).' : '.'))), TIMEOUT)),
+      ]);
+      // A crash can leave the call hanging or let it return: either way it failed
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      if (state.dead) throw new Error('Pyodide reported a fatal error of the interpreter during this test.');
+      done('ok', 'OK', `${result}  (${Math.round(performance.now() - started)} ms)`);
+    } catch (err) {
+      if (/No answer after/.test(String(err))) state.dead = state.dead || !!state.py;
+      done('fail', 'FAILED', describe(err));
+    }
+    sink = null;
+    li.scrollIntoView({ block: 'nearest' });
+  }
+  $('report').value = report.join('\n');
+  $('report').hidden = false;
+  $('copy').hidden = false;
+  $('start').disabled = false;
+  $('start').textContent = 'Run the tests again (reloads the page)';
+  $('start').onclick = () => location.reload();
+  console.log(state.dead || report.some((line) => line.startsWith('[FAILED]')) ? 'DIAGNOSE FAIL' : 'DIAGNOSE OK');
+}
+
+$('start').onclick = run;
+$('copy').onclick = async () => {
+  try { await navigator.clipboard.writeText($('report').value); $('copy').textContent = 'Copied'; } catch {
+    $('report').select();
+    document.execCommand('copy');
+    $('copy').textContent = 'Copied';
+  }
+};
+if (new URLSearchParams(location.search).has('auto')) run();
+</script>
+</body>
+</html>

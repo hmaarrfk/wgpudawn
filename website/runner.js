@@ -82,6 +82,47 @@ async function fetchBytes(url) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
+// What the browser and Pyodide write to the console, in the page too: on a
+// phone there is no console to look at. Pyodide reports a crash of the
+// interpreter (a "fatal error") only there, and then never returns from the
+// call that was running; `fatal` lets runExample() end instead of waiting.
+let consoleLog = null;
+let onFatal = null;
+const fatal = new Promise((resolve, reject) => { onFatal = reject; });
+fatal.catch(() => {});
+
+function describe(value) {
+  if (value instanceof Error) return value.stack || `${value.name}: ${value.message}`;
+  if (typeof value === 'string') return value;
+  try { return JSON.stringify(value); } catch { return String(value); }
+}
+
+function captureConsole() {
+  const report = (label, values) => {
+    const text = values.map(describe).join(' ');
+    if (consoleLog) consoleLog(`[${label}] ${text}`, 'console');
+    if (/fatal error/i.test(text)) {
+      // The cause follows in the next console messages: let them arrive
+      setTimeout(() => onFatal(new Error(
+        'Pyodide crashed (a fatal error of the interpreter). The cause is in the output.')), 300);
+    }
+  };
+  for (const name of ['error', 'warn']) {
+    const original = console[name].bind(console);
+    console[name] = (...values) => { original(...values); report('console.' + name, values); };
+  }
+  window.addEventListener('error', (event) => report('uncaught', [event.error || event.message]));
+  window.addEventListener('unhandledrejection', (event) => report('unhandled rejection', [event.reason]));
+}
+captureConsole();
+
+// One line that says what this browser is, for bug reports
+export function describeBrowser() {
+  const gpu = supportsWebGPU() ? 'yes' : 'no';
+  const jspi = supportsJSPI() ? 'yes' : 'no';
+  return `${navigator.userAgent} | WebGPU: ${gpu} | JSPI: ${jspi}`;
+}
+
 export function supportsWebGPU() {
   return typeof navigator !== 'undefined' && !!navigator.gpu;
 }
@@ -96,6 +137,8 @@ export function supportsJSPI() {
 export async function runExample(manifest, example, options = {}) {
   const log = options.log || (() => {});
   const status = (text) => log(text, 'status');
+  consoleLog = log;
+  log(describeBrowser(), 'out');
 
   status('Loading Pyodide');
   const { loadPyodide } = await import(manifest.pyodide.url + 'pyodide.mjs');
@@ -133,7 +176,7 @@ export async function runExample(manifest, example, options = {}) {
   await py.runPythonAsync(BOOTSTRAP);
   py.globals.set('example_id', example.id);
   // runPythonAsync, so that the blocking API of wgpu works (via JSPI)
-  await py.runPythonAsync(RUN);
+  await Promise.race([py.runPythonAsync(RUN), fatal]);
   status('');
   return py;
 }

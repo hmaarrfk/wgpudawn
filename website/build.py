@@ -241,7 +241,14 @@ def main():
     os.makedirs(os.path.join(out, "wheels"), exist_ok=True)
 
     # Static files
-    for name in ("index.html", "run.html", "site.css", "runner.js", "logo.svg"):
+    for name in (
+        "index.html",
+        "run.html",
+        "site.css",
+        "runner.js",
+        "logo.svg",
+        "diagnose.html",
+    ):
         shutil.copy(os.path.join(HERE, name), os.path.join(out, name))
     open(os.path.join(out, ".nojekyll"), "w").close()
 
