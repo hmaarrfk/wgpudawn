@@ -127,7 +127,7 @@ jobs:
         path: ${{ steps.dawn.outputs.prefix }}
         key: ${{ steps.dawn-cache.outputs.cache-primary-key }}
     - name: Build wheel
-      uses: pypa/cibuildwheel@v3.2.1
+      uses: pypa/cibuildwheel@v4.3.1
       env:
         # On Linux the build runs in a container, with the host mounted at /host
         CIBW_ENVIRONMENT_LINUX: DAWN_PREFIX=/host${{ steps.dawn.outputs.prefix }}
