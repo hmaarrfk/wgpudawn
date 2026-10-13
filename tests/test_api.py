@@ -224,5 +224,31 @@ def test_register_backend_fails():
         wgpu.backends._register_backend(ori_gpu)
 
 
+def test_install_as_wgpu():
+    # In a subprocess, because it changes what `import wgpu` means
+    code = """
+import sys, wgpudawn
+assert "wgpu" not in sys.modules
+wgpudawn.install_as_wgpu()
+wgpudawn.install_as_wgpu()  # idempotent
+import wgpu, wgpu.utils.compute, wgpu.backends.auto
+from wgpu import GPUDevice
+from wgpu.backends.wgpu_native import GPUBuffer
+import wgpudawn.utils.compute, wgpudawn.backends.dawn
+assert GPUDevice is wgpudawn.GPUDevice
+assert wgpu.utils.compute is wgpudawn.utils.compute
+assert GPUBuffer is wgpudawn.backends.dawn.GPUBuffer
+assert wgpu.gpu is wgpudawn.gpu
+assert wgpu.__version__ == wgpudawn.wgpu_py_version
+assert wgpu.version_info >= (0, 32)
+print("ok")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True
+    )
+    out = (result.stdout + result.stderr).strip()
+    assert out.endswith("ok"), out
+
+
 if __name__ == "__main__":
     run_tests(globals())

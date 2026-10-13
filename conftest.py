@@ -5,7 +5,11 @@ import pytest
 
 
 # Load the backend up front, so that all tests see the real `gpu` object.
-import wgpudawn.backends.auto  # noqa: F401
+# The codegen tests also run without the compiled extension.
+try:
+    import wgpudawn.backends.auto  # noqa: F401
+except ImportError:
+    pass
 
 
 def pytest_addoption(parser):

@@ -56,6 +56,8 @@ def get_cmake_args(prefix):
         "-DTINT_BUILD_TESTS=OFF",
         "-DTINT_BUILD_CMD_TOOLS=OFF",
         "-DTINT_BUILD_IR_BINARY=OFF",
+        # SPIR-V shader modules on all platforms (by default only with Vulkan)
+        "-DTINT_BUILD_SPV_READER=ON",
         # The OpenGL backends are not built: they need EGL/ANGLE, and are not
         # WebGPU-conformant. Vulkan, Metal and D3D11/12 are (per platform).
         "-DDAWN_ENABLE_DESKTOP_GL=OFF",

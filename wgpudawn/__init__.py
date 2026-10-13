@@ -17,6 +17,7 @@ from .utils.device import *
 from . import utils
 from . import backends
 from . import resources
+from ._as_wgpu import install_as_wgpu
 
 
 # The version of wgpu-py that this version of wgpudawn mirrors: same API, and

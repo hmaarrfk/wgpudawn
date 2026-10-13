@@ -60,11 +60,26 @@ Differences with wgpu-py:
 
 ### Libraries that `import wgpu`
 
-Libraries such as pygfx and rendercanvas import `wgpu` by name, so they use
-wgpu-py, also when wgpudawn is installed. This repository has a small
-stand-in for wgpu-py in `tests/wgpu_shim` that makes `import wgpu` resolve to
-wgpudawn. It is used for testing only (CI runs the test suite of pygfx with
-it), and it is not part of the wgpudawn package.
+Libraries such as pygfx and rendercanvas import `wgpu` by name, so by default
+they use wgpu-py, also when wgpudawn is installed. To run them on wgpudawn,
+opt in before anything imports `wgpu`:
+
+```py
+import wgpudawn
+
+wgpudawn.install_as_wgpu()
+
+import pygfx  # `import wgpu` now gives wgpudawn, in this process
+```
+
+After that, `wgpu` and its submodules are wgpudawn's (the same module
+objects), and `wgpu.__version__` is `wgpudawn.wgpu_py_version`. wgpudawn never
+installs a `wgpu` module on disk, so it stays co-installable with wgpu-py.
+
+CI runs the unit tests of pygfx this way, using `tests/wgpu_shim`: a test-only
+package named `wgpu` that calls `install_as_wgpu()`, and that takes the place
+of wgpu-py so that pygfx's requirement on it is satisfied. It is not part of
+the wgpudawn package.
 
 ## Platforms
 
@@ -76,8 +91,9 @@ Wheels are built for:
 | macOS (>= 11) | yes | yes |
 | Windows | yes | yes |
 
-In Pyodide, the same bindings run on the WebGPU of the browser (via Dawn's
-Emdawnwebgpu); CI builds and tests that wheel, but it is not published yet.
+There is also a wheel for [Pyodide](https://pyodide.org) (Pyodide 314, i.e.
+Python 3.14): there, the same bindings run on the WebGPU of the browser, via
+Dawn's Emdawnwebgpu. `demo/` is a page that uses it.
 
 ## Building from source
 

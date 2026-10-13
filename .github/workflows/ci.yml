@@ -73,7 +73,8 @@ jobs:
         include:
           - { name: linux-x86_64, os: ubuntu-24.04 }
           - { name: linux-aarch64, os: ubuntu-24.04-arm }
-          - { name: macos-arm64, os: macos-14 }
+          # Dawn needs a recent Xcode (16+); the deployment target is still macOS 11
+          - { name: macos-arm64, os: macos-15 }
           - { name: macos-x86_64, os: macos-15-intel }
           - { name: windows-amd64, os: windows-2022, msvc_arch: x64 }
           - { name: windows-arm64, os: windows-11-arm, msvc_arch: arm64 }
@@ -259,7 +260,7 @@ jobs:
         ls -l dist
     - uses: actions/upload-artifact@v4
       with:
-        name: pyodide-wheel
+        name: dist-wheel-pyodide
         path: dist/*.whl
     - uses: actions/setup-node@v4
       with:
@@ -289,7 +290,7 @@ jobs:
   publish:
     name: Publish to PyPI
     if: github.ref_type == 'tag'
-    needs: [lint, sdist, wheels, test, pygfx]
+    needs: [lint, sdist, wheels, test, pygfx, pyodide]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:

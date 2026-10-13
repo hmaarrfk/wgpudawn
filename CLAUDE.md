@@ -10,8 +10,10 @@ wgpu-py, version for version. Read `README.md` first.
 * `wgpudawn/enums.py`, `flags.py`, `structs.py`, `backends/dawn/_mappings.py`
   and the `# H:` / `# IDL:` comments are written by `python codegen`.
 * `wgpudawn/_lib/`: the cffi extension (`build_cffi.py`), Dawn statically linked.
-* `tests/wgpu_shim/`: test-only stand-in for wgpu-py. Never ship it, and never
-  add a `wgpu` module to the wgpudawn package.
+* `wgpudawn.install_as_wgpu()` (`_as_wgpu.py`) is the opt-in way to make
+  `import wgpu` resolve to wgpudawn at runtime. `tests/wgpu_shim/` is a test-only
+  stand-in for wgpu-py that calls it. Never ship that, and never add a `wgpu`
+  module to the wgpudawn package.
 * The version is the git tag (miniver); tags have no `v` prefix. Pushing a tag
   publishes to PyPI.
 
