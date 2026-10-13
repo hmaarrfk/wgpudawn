@@ -17,3 +17,8 @@ These are the libraries that the build of the Dawn release in `upstream.json`
 compiles (the directories under `third_party/` in its build tree). When Dawn
 is updated, compare that list and these texts with the new release (the
 `update-dawn` skill has the step).
+
+The Windows wheels also contain Microsoft's C++ runtime (`msvcp140.dll`,
+`msvcp140_atomic_wait.dll`, in `wgpudawn.libs/`), which `delvewheel` copies
+from the build machine (the default repair step of cibuildwheel 4). These are
+redistributable files of Visual Studio, under Microsoft's terms for them.

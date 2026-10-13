@@ -81,8 +81,10 @@ glibc >= 2.28). If a new cibuildwheel changes its default image, set the image
 in `[tool.cibuildwheel]` rather than raising the glibc floor silently. A new
 major also changes defaults of the repair step (4.0: `delvewheel` on Windows,
 `abi3audit` on abi3 wheels): after the bump, list the contents of every wheel
-(the loop in step 3 of the `release` skill) and compare with before; a DLL
-that got bundled, or a wheel that is no longer `cp311-abi3`, is a regression.
+(the loop in step 3 of the `release` skill) and compare with before; a new DLL
+in a wheel, or a wheel that is no longer `cp311-abi3`, is a regression. (The
+Windows wheels have `msvcp140*.dll` in `wgpudawn.libs/` since cibuildwheel 4:
+intended, and listed in `LICENSES/README.md`.)
 
 **Python versions.** The wheels are abi3 (`cp311-abi3`: `build = "cp311-*"`
 in `pyproject.toml`, `py_limited_api` in `setup.py`), so a new Python needs

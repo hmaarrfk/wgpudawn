@@ -120,6 +120,30 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-13 - Everything that was due: Dawn, the CI, the first release candidate
+
+Same session, continued: the human asked for an issue to track the Safari
+crash (#1), for everything out of date to be updated, and said to push the
+release candidate. Totals of the whole session at this point: see the header
+that `python tools/session_stats.py --markdown` prints (about 11 h wall
+clock, 31 human prompts, `claude-opus-5-5` (Anthropic)).
+
+* **Dawn** v20260929.200159 -> v20261009.190412 (`update-dawn`): one added
+  feature enum in the header, nothing to adapt. Tests, pygfx's tests and the
+  benchmark verified locally before the push.
+* **CI** (`refresh-infra`), verified by a run on a branch (38387421642)
+  before `main`: the actions at their current majors, cibuildwheel 4.3.1,
+  Python 3.15 in the test matrix, puppeteer-core 25, webgpu 0.6.2, ruff
+  0.17.0. cibuildwheel 4 repairs Windows wheels with delvewheel, so they now
+  carry `msvcp140*.dll`; found by comparing the contents of the wheels of the
+  two runs, kept, and noted in `LICENSES/README.md`.
+* **0.0.1rc1** tagged on a3097e6, the newest commit whose CI was green at
+  that moment (not on the commits above, which were not yet tested on `main`).
+* Left as it is: `ilammy/msvc-dev-cmd@v1` (runs on a deprecated Node.js; no
+  newer release exists), `ubuntu-latest` (moves to Ubuntu 26 from 2026-10-19;
+  not tried ahead), FreeType 2.13.3 for the website (2.15.0 exists; the
+  pictures cannot be compared on this machine right now).
+
 ## 2026-10-13 - Safari: examples without stack switching
 
 Same session as the entry below, continued after the human ran
