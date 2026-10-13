@@ -397,6 +397,7 @@ jobs:
       url: https://pypi.org/project/wgpudawn/
     permissions:
       id-token: write  # trusted publishing: no token needed
+      contents: write  # the release on GitHub
     steps:
     - uses: actions/download-artifact@v8
       with:
@@ -415,3 +416,13 @@ jobs:
     - uses: pypa/gh-action-pypi-publish@release/v1
       with:
         print-hash: true
+    # A tag alone does not show under "Releases" on GitHub. After PyPI has
+    # the files, so that a release is never announced that cannot be installed.
+    - name: Release on GitHub
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        case "$GITHUB_REF_NAME" in *rc*|*a*|*b*|*dev*) pre=--prerelease ;; *) pre= ;; esac
+        gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --verify-tag --generate-notes $pre \
+            --title "$GITHUB_REF_NAME"

@@ -202,13 +202,18 @@ what one wants: nobody's lock file breaks.
 
 ## 6. Release notes
 
-For a final release (for a candidate: the same with `--prerelease`, and one
-line of notes):
+The publish job of the workflow creates the release on GitHub after the
+upload (a tag alone does not show under "Releases"), with generated notes, as
+a prerelease for a candidate. For a final release, replace those notes (for a
+candidate, one line is enough):
 
 ```sh
 git log --format="* %s (%h)" <previous final tag>..<version> > ../release-notes.md    # raw material: rewrite it
-gh release create <version> --verify-tag --title "<version>" --notes-file ../release-notes.md
+gh release edit <version> --notes-file ../release-notes.md
 ```
+
+(If the release is not there, the job failed after the upload: `gh release
+create <version> --verify-tag --title "<version>" --notes-file ...`.)
 
 Write the notes for a user of wgpu-py, short: the wgpu-py version that it
 mirrors and the Dawn release that it contains (old -> new when it changed, with
