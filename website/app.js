@@ -724,6 +724,16 @@ function buildGallery() {
     }
   }
 
+  // Python starts while the visitor looks at the gallery, so that the first
+  // example opens as the next ones do. Where the live example started by
+  // itself this is done already; this is for where it did not (a phone, a
+  // visitor who scrolled past it). Not when the browser asks to save data:
+  // it is tens of megabytes.
+  if (webgpu && !(navigator.connection && navigator.connection.saveData)) {
+    const early = () => setTimeout(() => idle(() => runner.boot().catch(() => {})), 1500);
+    if (document.readyState === 'complete') early(); else addEventListener('load', early, { once: true });
+  }
+
   // -------------------------------------------------------------- gallery
 
   // A screenshot of a canvas on which nothing was drawn (yet) is not a picture
