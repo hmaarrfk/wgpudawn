@@ -140,6 +140,21 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-13 - 0.0.2, and an example that asks the GPU what it allows
+
+Same session, continued.
+
+* 0.0.2: the same code as 0.0.1; the logo in the README has an absolute
+  address, because PyPI does not resolve relative ones (and the page of a
+  release cannot be changed afterwards). It was the first tag whose GitHub
+  release was made by the publish job: pushing the tag is the whole release.
+* `other/image_histogram` used 1024 invocations per compute workgroup, WebGPU
+  guarantees 256, and so it failed on the software GPU that checks the site.
+  On the pygfx branch the example now reads the limit of the device and
+  uses chunks of 16x16 or 8x8 pixels. The picture is identical, pixel for
+  pixel, with both, also on a device made with the default limits (where the
+  previous version fails). It is in the list of examples that must work.
+
 ## 2026-10-13 - Python starts with the gallery; the first release
 
 Same session, continued.

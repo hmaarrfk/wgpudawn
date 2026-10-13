@@ -141,6 +141,7 @@
  "other/compare_images",
  "other/gpu_selection",
  "other/hirez_screenshot",
+ "other/image_histogram",
  "other/reactive_rendering",
  "other/two_canvases",
  "validation/validate_alpha",
