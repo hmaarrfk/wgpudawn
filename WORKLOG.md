@@ -128,6 +128,14 @@ in parentheses.
   reported, run it again in the browser before saying that it works: the
   limits of a browser are lower than those of a native device. (2026-10-13)
 
+* A picture that "looks plausible" is not checked. Compare the picture from
+  the browser with the same example rendered natively before it becomes the
+  reference; a grid with holes looks like a design. (2026-10-13)
+* When the calls and the data on the GPU are right and the picture is wrong,
+  the data was wrong before it got there: check the values, not the
+  plumbing. And a browser is a different machine: its clock is coarse on
+  purpose. (2026-10-13)
+
 ## Sessions
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
@@ -143,8 +151,16 @@ Same session, continued.
   the workflow `wheels.yml`, the repository had `ci.yml`. The error message
   of PyPI lists what the run claimed, not what PyPI expects, so only the
   human could see the difference. The workflow file is renamed.
-* A report from Safari on a Mac (most spheres of pbr2 missing) could not be
-  reproduced: the WebKit of Playwright on Linux has no WebGPU. Open.
+* 0.0.1 is on PyPI, with a release on GitHub; the publish job makes the
+  release from now on.
+* Objects were missing in the browser (most spheres of pbr2 in Safari, a
+  seventh of the images of labelled_image_grid in Chrome). The reference
+  picture in this repository had the holes too, and had passed as "looks
+  plausible". Every WebGPU call was right and so were the buffers on the
+  GPU; the positions in them were not. pygfx uses `perf_counter_ns()` as the
+  version of a transform, browsers limit the resolution of that clock, and
+  the second of two changes in one tick was lost. Fixed on the pygfx branch;
+  all pictures of the gallery were made again, on a GPU, and looked at.
 
 ## 2026-10-13 - The website on a branch of pygfx with the fixes it needs
 

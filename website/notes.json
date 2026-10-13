@@ -4,5 +4,5 @@
   "feature_demo/geometry_plane": "Plays a video (cockatoo.mp4), which needs PyAV to decode. PyAV (FFmpeg) has no build for Pyodide.",
   "other/sponza_scene": "Needs the glTF-Sample-Assets repository (hundreds of MB) next to the examples; the site does not ship it.",
   "validation/validate_view_offset": "Draws an offscreen canvas from inside the draw callback of the visible one and waits for the result. In a browser, a draw callback cannot block (no JSPI stack there), so the readback is not available.",
-  "other/image_histogram": "The compute shader of this example has 1024 invocations per workgroup (16 x 16 x 4). WebGPU's default limit is 256, and a browser gives no more unless it is asked. Needs a change in the example."
+  "other/image_histogram": "The compute shader of this example has 1024 invocations per workgroup (16 x 16 x 4). WebGPU guarantees 256; it runs where the GPU allows more (not on the software GPU that checks this site)."
 }
