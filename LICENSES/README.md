@@ -1,13 +1,19 @@
 # Licenses of what the wheels contain
 
 The wheels of wgpudawn statically link Dawn, which is built from source by
-`tools/build_dawn.py` together with the third-party libraries that it uses.
+`tools/build_dawn.py` together with the third-party libraries that it compiles
+in. Their license texts are in this directory, and are part of every wheel:
 
-* Dawn and Tint: BSD 3-Clause, see `DAWN-LICENSE`.
-* Abseil, SPIRV-Tools, SPIRV-Headers, Vulkan-Headers, Vulkan-Utility-Libraries:
-  Apache License 2.0 (Vulkan-Headers: Apache 2.0 OR MIT).
-* Vulkan Memory Allocator, DirectX-Headers (Windows): MIT.
+| Component | License | Text |
+|---|---|---|
+| Dawn and Tint | BSD 3-Clause | `DAWN-LICENSE` |
+| Abseil | Apache 2.0 | `ABSEIL-LICENSE` |
+| SPIRV-Tools | Apache 2.0 | `SPIRV-TOOLS-LICENSE` |
+| SPIRV-Headers | MIT-style (Khronos) | `SPIRV-HEADERS-LICENSE` |
+| Vulkan-Headers | Apache 2.0 OR MIT | `VULKAN-HEADERS-LICENSE.md` |
+| Vulkan-Utility-Libraries | Apache 2.0 | `VULKAN-UTILITY-LIBRARIES-LICENSE.md` |
 
-The exact set and versions are those in the `DEPS` file of the Dawn release in
-`upstream.json`; their license texts are in the `third_party` directory of
-Dawn's source tree.
+These are the libraries that the build of the Dawn release in `upstream.json`
+compiles (the directories under `third_party/` in its build tree). When Dawn
+is updated, compare that list and these texts with the new release (the
+`update-dawn` skill has the step).

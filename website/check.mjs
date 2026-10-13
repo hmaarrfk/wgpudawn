@@ -26,6 +26,9 @@ const option = (name, fallback) => {
 const only = option('--only', '');
 const jobs = Number(option('--jobs', '4'));
 const timeout = Number(option('--timeout', '180')) * 1000;
+// A JPEG of one flat color is about 0.0073 bytes per pixel (4.2 kB at 960x600);
+// a dark scene with a few thin lines is already over 0.0082
+const BLANK_BYTES_PER_PIXEL = 0.0077;
 const failedOnly = args.includes('--failed');  // only what did not work last time
 
 const types = {
@@ -35,13 +38,14 @@ const types = {
 };
 const server = http.createServer((req, res) => {
   const p = path.join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+  if (path.relative(path.resolve(dir), path.resolve(p)).startsWith('..')) { res.writeHead(403); res.end(); return; }
   fs.readFile(p, (err, data) => {
     if (err) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'Content-Type': types[path.extname(p)] || 'application/octet-stream' });
     res.end(data);
   });
-}).listen(0);
-const origin = `http://localhost:${server.address().port}`;
+}).listen(0, '127.0.0.1');
+const origin = `http://127.0.0.1:${server.address().port}`;
 
 const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'examples.json'), 'utf8'));
 const resultsFile = path.join(dir, 'results.json');
@@ -80,8 +84,18 @@ async function checkExample(browser, example) {
     fs.mkdirSync(path.dirname(shot), { recursive: true });
     try {
       const canvas = await tab.$('#canvas');
-      await canvas.screenshot({ path: shot, type: 'jpeg', quality: 82 });
+      const box = await canvas.boundingBox();
+      const BLANK_BYTES = BLANK_BYTES_PER_PIXEL * box.width * box.height;
+      let image = await canvas.screenshot({ type: 'jpeg', quality: 82 });
+      // A flat image compresses to almost nothing: nothing was drawn (yet).
+      // Some examples need a moment; look once more before believing it.
+      if (image.length < BLANK_BYTES) {
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+        image = await canvas.screenshot({ type: 'jpeg', quality: 82 });
+      }
+      fs.writeFileSync(shot, image);
       result.shot = `shots/${example.id}.jpg`;
+      if (image.length < BLANK_BYTES) result.blank = true;
     } catch (err) {
       // It ran, but the page is too busy to answer (e.g. a heavy animation)
       result.ok = false;
@@ -89,8 +103,13 @@ async function checkExample(browser, example) {
     }
   } else {
     // The last lines say what went wrong; the gallery shows them
+    // The first error is the cause, the last lines are where it surfaced
     const lines = outcome.error.trim().split('\n');
-    result.error = lines.slice(-12).join('\n').slice(-1500);
+    const first = lines.findIndex((line) => /Traceback|ERROR:/.test(line));
+    const head = first < 0 ? [] : lines.slice(first, first + 12);
+    const tail = lines.slice(-12).filter((line) => !head.includes(line));
+    const gap = head.length && tail.length ? ['...'] : [];
+    result.error = [...head, ...gap, ...tail].join('\n').slice(0, 3000);
   }
   await tab.close().catch(() => {});
   return result;
@@ -119,12 +138,16 @@ async function worker() {
 await Promise.all(Array.from({ length: jobs }, worker));
 server.close();
 
-const counts = { ok: 0, failed: 0, skipped: manifest.examples.filter((e) => e.skip).length };
+const counts = { ok: 0, failed: 0, blank: 0, skipped: manifest.examples.filter((e) => e.skip).length };
 for (const example of manifest.examples) {
-  if (results[example.id]) counts[results[example.id].ok ? 'ok' : 'failed'] += 1;
+  const result = results[example.id];
+  if (!result) continue;
+  counts[result.ok ? 'ok' : 'failed'] += 1;
+  if (result.ok && result.blank) counts.blank += 1;
 }
 fs.writeFileSync(resultsFile, JSON.stringify({ counts, examples: results }, null, 1));
-console.log(`${counts.ok} ok, ${counts.failed} failed, ${counts.skipped} cannot run in a browser`);
+console.log(`${counts.ok} ok (${counts.blank} of them drew nothing visible), ${counts.failed} failed, ` +
+  `${counts.skipped} cannot run in a browser`);
 
 const working = Object.keys(results).filter((id) => results[id].ok).sort();
 const writeExpected = option('--write-expected', '');

@@ -18,12 +18,18 @@ Arguments (optional): `$ARGUMENTS`
 * a pygfx ref (branch, tag or sha). Default: `main`.
 * `pyodide=<version>`: also move to that Pyodide release (see step 5).
 
+Whether this is due: `python tools/maintenance_status.py --only pygfx,pyodide`.
+The site is also rebuilt, with the pinned inputs, by every push to `main`.
+
 ## How it fits together
 
 * `website/build.py` assembles the site from a pygfx checkout and a directory
   of wheels; `examples.json` lists the examples with what the pages need.
   Examples that cannot run in any browser (Qt, PyTorch, ...) get a `skip`
-  reason from the `UNAVAILABLE` table in `build.py`.
+  reason from the `UNAVAILABLE` table (by imported module) or the
+  `SKIP_REASONS` table (by example) in `build.py`.
+* `website/notes.json`: for the examples that are run and fail, why, in
+  sentences that the gallery shows next to the example. You maintain it.
 * `website/runner.js` runs one example: loads Pyodide and packages, unpacks
   the wheels, calls `wgpudawn.install_as_wgpu()`, runs the file as `__main__`.
   Packages that an example imports are loaded up front (the tables in
@@ -39,13 +45,19 @@ Arguments (optional): `$ARGUMENTS`
 ## 1. Build locally
 
 ```sh
-git -C ../pygfx-src fetch && git -C ../pygfx-src checkout <ref>     # clone https://github.com/pygfx/pygfx if missing
-mkdir -p ../web-wheels
+[ -d ../pygfx-src ] || git clone https://github.com/pygfx/pygfx ../pygfx-src
+git -C ../pygfx-src fetch -q origin <ref> && git -C ../pygfx-src checkout -q FETCH_HEAD
+rm -rf ../web-wheels && mkdir -p ../web-wheels      # empty: build.py takes one wheel per package, whichever sorts last
 pip wheel --no-deps -w ../web-wheels ../pygfx-src
-gh run download -n dist-wheel-pyodide -D ../web-wheels              # wgpudawn for Pyodide, from the last CI run on main
-gh run download -n web-wheels -D ../web-wheels                      # freetype-py for Pyodide
+# wgpudawn and freetype-py for Pyodide, from the last green CI run on main
+run=$(gh run list --branch main --workflow CI --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run download $run -n dist-wheel-pyodide -D ../web-wheels
+gh run download $run -n web-wheels -D ../web-wheels
 python website/build.py --pygfx ../pygfx-src --wheels ../web-wheels --out ../site
 ```
+
+(No green run yet, or its artifacts expired after 90 days: take the newest run
+whose `Pyodide` job succeeded, `gh run list --branch main --workflow CI`.)
 
 Use the wgpudawn wheel of the commit you are on: if you changed `wgpudawn/` or
 the bindings, build it instead (`pyodide build --exports pyinit`, see the
@@ -79,14 +91,30 @@ For each example that fails, find out why, in this order:
 3. **wgpudawn is wrong**: reproduce it natively first, where validation errors
    are raised at the failing call (in the browser they arrive later and
    anonymous: "[Invalid RenderPipeline] is invalid due to a previous error"
-   means exactly that). Run the example on wgpudawn with
-   `RENDERCANVAS_FORCE_OFFSCREEN=1`, fix the backend, add a test in `tests/`.
-   A difference with what wgpu-py does that a user would notice is a wgpudawn
-   bug.
+   means exactly that). Draw one frame of the example on wgpudawn, offscreen
+   (below), fix the backend, add a test in `tests/`. A difference with what
+   wgpu-py does that a user would notice is a wgpudawn bug.
 4. **pygfx or the example is wrong** per the WebGPU/WGSL spec (Tint is
-   strict): do not work around it here. Leave it failing, and put the precise
-   report (file, error, spec rule, suggested fix) in your final report so that
-   it can go upstream.
+   strict): do not work around it here. Leave it failing, say why in
+   `website/notes.json`, and put the precise report (file, error, spec rule,
+   suggested fix) in your final report; the `upstream-report` skill turns
+   those into issues for pygfx.
+
+Keep `website/notes.json` true in both directions: add a note for an example
+that newly fails for reason 2 (not provided yet) or 4, and remove the note of
+an example that works now.
+
+One frame of an example, natively (the development environment has pygfx
+editable and the shim that makes `import wgpu` wgpudawn; adapt the names
+`canvas`, `renderer`, `scene`, `camera` to the example):
+
+```sh
+RENDERCANVAS_FORCE_OFFSCREEN=1 python -c "
+import runpy, sys
+m = runpy.run_path(sys.argv[1], run_name='example')      # not __main__: the example does not enter its event loop
+m['canvas'].request_draw(m.get('animate') or (lambda: m['renderer'].render(m['scene'], m['camera'])))
+print('drew', m['canvas'].draw().shape)" ../pygfx-src/examples/feature_demo/volume_render1.py 2>&1 | grep -v "^Warning"
+```
 
 An example in `expected.json` that fails is a regression: it must be fixed
 (1-3) or, only for 4 or for an input that genuinely disappeared, removed from
@@ -107,8 +135,13 @@ drawing: treat it as a failure (and consider making `check.mjs` detect it).
 
 ## 5. Pyodide update (only when asked or needed)
 
-The Pyodide version is in three places that must agree: `website/pyodide.json`,
-`PYODIDE_VERSION` in `.github/workflows/ci.yml`, and `tests/pyodide/package.json`.
+The Pyodide version is in four places that must agree: `website/pyodide.json`
+(`version`, and inside `url`), `PYODIDE_VERSION` in `.github/workflows/ci.yml`,
+and `tests/pyodide/package.json`; `python tools/maintenance_status.py --only pyodide`
+checks that. With them go `PYODIDE_BUILD_VERSION` (the pyodide-build that
+supports that Pyodide) and the `python-version` of the `pyodide` job in
+`ci.yml` (the Python of that Pyodide), and the sentence about Pyodide in the
+Platforms section of `README.md`.
 A new Pyodide can mean a new Emscripten and platform tag
 (`pyemscripten_<year>_<n>_wasm32`): then also `PLATFORM_TAG` in
 `website/build_freetype.sh` (and its compiler flags: compare with
@@ -122,12 +155,15 @@ be run with the Emscripten of the target Pyodide, which the build does.
 * `upstream.json`: `pygfx.commit` = the full sha that you built with.
 * Commit on `main` (follow the user's commit message conventions) and push.
   CI builds the site, checks every example on SwiftShader against
-  `expected.json`, and deploys. Watch it (`gh run watch`); the `Website` job
+  `expected.json`, and deploys. Watch it
+  (`gh run watch <run-id> --exit-status`, with the id from
+  `gh run list --branch main --workflow CI --limit 1`); the `Website` job
   uploads the built site as the `website` artifact also when it fails, with
-  its `results.json`. An example that works on a GPU but not on SwiftShader
+  its `results.json` (`gh run download <run-id> -n website -D <dir>`). An example that works on a GPU but not on SwiftShader
   (usually a timeout) should get a more generous `--timeout` or be made
   lighter in the checker, not be dropped.
-* Open the deployed site (the URL is in the `deploy-website` job) and confirm
+* Open the deployed site (https://www.markharfouche.com/wgpudawn/; it is what
+  `gh api repos/hmaarrfk/wgpudawn/pages --jq .html_url` prints) and confirm
   that it loads and that one example runs.
 
 ## 7. Report
@@ -136,3 +172,8 @@ End with: the pygfx range (old sha -> new sha) and other inputs that changed,
 the counts (work / fail / cannot run) before and after, every example whose
 status changed and why, fixes made in wgpudawn, reports for pygfx, the CI run,
 and the URL.
+
+
+Finally, add the entry for this session to `WORKLOG.md` (its header comes from
+`python tools/session_stats.py --markdown`; see the instructions at the top of
+that file), and commit it.

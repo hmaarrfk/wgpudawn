@@ -30,7 +30,7 @@
       <svg class="icon mark"><use href="#i-mark"/></svg>wgpudawn <span>gallery</span>
     </a>
     <nav aria-label="Project">
-      <a class="ghost" href="https://pypi.org/project/wgpudawn/" target="_blank" rel="noopener"><code>pip install wgpudawn</code></a>
+      <a class="ghost wide" href="https://pypi.org/project/wgpudawn/" target="_blank" rel="noopener"><code>pip install wgpudawn</code></a>
       <a class="ghost keep" href="https://github.com/hmaarrfk/wgpudawn" target="_blank" rel="noopener" aria-label="wgpudawn on GitHub"><svg class="icon"><use href="#i-github"/></svg><span>GitHub</span></a>
     </nav>
   </div>
@@ -92,7 +92,7 @@
         <label class="switch" id="off-switch" hidden>
           <input id="off" type="checkbox" checked>
           <i aria-hidden="true"></i>
-          <span>Show what does not run</span> <small id="off-count"></small>
+          <span><span class="wide">Show what does not run</span><span class="narrow">Not running</span></span> <small id="off-count"></small>
         </label>
       </div>
     </div>
@@ -179,9 +179,12 @@ try {
 
 // ------------------------------------------------------------ the examples
 
-function lastLine(text) {
+// One line of an error: the exception of a traceback, else the first error that was logged
+function summary(text) {
   const lines = String(text || '').trim().split('\n').map((l) => l.trim()).filter(Boolean);
-  return (lines.pop() || 'It raised an error.').replace(/: Runtime\.\w+ timed out.*$/, '.');
+  const last = lines[lines.length - 1] || 'It raised an error.';
+  if (/^[\w.]*(Error|Exception)\b/.test(last)) return last;
+  return (lines.find((l) => l.startsWith('ERROR:')) || last).replace(/: Runtime\.\w+ timed out.*$/, '.');
 }
 const examples = manifest.examples.map((example) => {
   const result = results && results[example.id];
@@ -192,7 +195,7 @@ const examples = manifest.examples.map((example) => {
     reason = example.skip;
   } else if (example.note || (result && !result.ok)) {
     state = 'fail';  // also when the (maybe stale) results say that it ran
-    reason = example.note || lastLine(result.error);
+    reason = example.note || summary(result.error);
   } else if (result) {
     state = 'ok';
   }
@@ -253,9 +256,10 @@ if (!webgpu) {
   $('browser').textContent = 'This browser has WebGPU, but not JSPI (WebAssembly stack switching), which the blocking parts of the API need: some examples will not run. Recent versions of Chrome and Edge have both.';
 }
 
-// One example runs live in the hero: light, animated, and known to work.
-const WISHES = ['feature_demo/skinned_mesh', 'feature_demo/mesh_toon2', 'feature_demo/morph_targets',
-  'feature_demo/look_at_instanced', 'feature_demo/text_waterfall', 'introductory/cube'];
+// One example runs live in the hero: animated, good looking, and known to work.
+// (pbr2 fetches imageio.zip for its environment map; the others need nothing extra.)
+const WISHES = ['feature_demo/pbr2', 'feature_demo/skinned_mesh', 'feature_demo/look_at_instanced',
+  'feature_demo/morph_targets', 'introductory/cube'];
 const light = (e) => e.animated && !e.needs_data && !e.pypi.length && !e.imageio.length;
 const hero = WISHES.map((id) => examples.find((e) => e.id === id && e.state === 'ok')).find(Boolean)
   || examples.find((e) => e.state === 'ok' && light(e))
@@ -321,6 +325,20 @@ if (hero) {
 
 // ---------------------------------------------------------------- gallery
 
+// A screenshot of a canvas on which nothing was drawn (yet) is not a picture
+const probe = document.createElement('canvas');
+probe.width = 32; probe.height = 20;
+function isEmpty(img) {
+  if (img.naturalWidth < 16) return true;
+  try {
+    const ctx = probe.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 32, 20);
+    const data = ctx.getImageData(0, 0, 32, 20).data;
+    for (let i = 0; i < data.length; i += 4) if (data[i] > 14 || data[i + 1] > 14 || data[i + 2] > 14) return false;
+    return true;
+  } catch { return false; }
+}
+
 function card(e) {
   const off = isOff(e);
   const thumb = h('span', { class: 'thumb' + (e.shot ? '' : ' empty') });
@@ -331,8 +349,11 @@ function card(e) {
   };
   if (e.shot) {
     const img = h('img', { src: e.shot, alt: '', loading: 'lazy', decoding: 'async', width: 960, height: 600 });
+    // A very wide or tall example is shown whole rather than cropped
+    const shape = e.size ? e.size[0] / e.size[1] : 1.6;
+    if (shape > 2.1 || shape < 1.05) { img.style.objectFit = 'contain'; img.style.background = '#000'; }
     img.addEventListener('error', blank);
-    img.addEventListener('load', () => { if (img.naturalWidth < 16) blank(); });  // an empty canvas
+    img.addEventListener('load', () => { if (isEmpty(img)) blank(); });
     thumb.append(img);
   } else {
     thumb.append(icon(e.state === 'skip' ? 'desktop' : e.state === 'fail' ? 'alert' : 'image'));

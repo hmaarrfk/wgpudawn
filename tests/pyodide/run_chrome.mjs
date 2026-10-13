@@ -19,12 +19,13 @@ const types = {
 };
 const server = http.createServer((req, res) => {
   const p = path.join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+  if (path.relative(path.resolve(dir), path.resolve(p)).startsWith('..')) { res.writeHead(403); res.end(); return; }
   fs.readFile(p, (err, data) => {
     if (err) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'Content-Type': types[path.extname(p)] || 'application/octet-stream' });
     res.end(data);
   });
-}).listen(0);
+}).listen(0, '127.0.0.1');
 
 const browser = await puppeteer.launch({
   executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome',
@@ -50,4 +51,4 @@ tab.on('console', (m) => {
 });
 tab.on('pageerror', (e) => { console.log('pageerror: ' + e.message); finish(1); });
 setTimeout(() => { console.log('FAIL: timeout'); finish(1); }, Number(timeout) * 1000);
-await tab.goto(`http://localhost:${server.address().port}/${page}`);
+await tab.goto(`http://127.0.0.1:${server.address().port}/${page}`);

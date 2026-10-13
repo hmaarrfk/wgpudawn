@@ -186,6 +186,9 @@ jobs:
     - name: Show adapters
       run: |
         python -c "import wgpudawn; print(wgpudawn.__version__); print(wgpudawn.diagnostics.dawn_info.get_dict()); [print(a.summary) for a in wgpudawn.gpu.enumerate_adapters_sync()]"
+    - name: There must be an adapter (else most tests are skipped)
+      if: runner.os == 'Linux'
+      run: python -c "import wgpudawn; assert wgpudawn.gpu.enumerate_adapters_sync(), 'no adapter'"
     - name: Run tests
       run: pytest -v -rs tests
 

@@ -27,6 +27,37 @@ pip install --no-deps ./tests/wgpu_shim
 ruff format . && ruff check . && pytest tests codegen
 ```
 
-To update Dawn: `/update-dawn`. To port a new wgpu-py release: `/sync-upstream`.
-Both release with the `release` argument. To update the website (the pygfx
-examples running in the browser, `website/`): `/update-website`.
+On the owner's machine the environment that has all of this is
+`conda activate ../.env` (with `../dawn-prefix`, `../pygfx-src`).
+
+## Maintenance: use the skills
+
+Each task has a procedure in `.claude/skills/<name>/SKILL.md`. Read it and
+follow it, also when you were not started through it.
+
+* `maintain`: the periodic run. Surveys what is due, does it by the skills
+  below, summarizes what waits for the owner. `/maintain dry-run` only plans.
+* `ci-doctor`: CI is red, or "why did this run fail".
+* `update-dawn`: move to a newer Dawn release (they are almost daily).
+* `sync-upstream`: port a new wgpu-py release or its main.
+* `update-website`: newer pygfx or Pyodide on the website (`website/`), or an
+  example that broke.
+* `refresh-infra`: actions, runner images, cibuildwheel, Python versions, npm
+  and other pins.
+* `triage`: open issues and pull requests; replies are drafts unless `post`.
+* `upstream-report`: findings for pygfx, wgpu-py, rendercanvas, Dawn, as
+  drafts; files only with `file=`.
+* `release`: tag and publish to PyPI, and verify it. Only when the owner asked
+  for a release (`/release`, or `release` passed to another skill).
+
+`python tools/maintenance_status.py` says which of these are due (read-only).
+Yours without asking: commits and pushes to `main`. The owner's: tags (PyPI),
+anything written on other repositories, merging and closing.
+
+## Work log
+
+`WORKLOG.md` is the public log of how this project is made, and you maintain
+it: before you finish a session that changed the repository, add an entry (its
+header comes from `python tools/session_stats.py --markdown`), and update its
+Practices section when the session taught something. Read the Practices
+section before starting substantial work.

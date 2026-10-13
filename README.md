@@ -1,6 +1,8 @@
-# wgpudawn
+<h1><img src="website/logo.svg" alt="" width="40" height="40" align="top"> wgpudawn</h1>
 
 WebGPU for Python, on [Dawn](https://dawn.googlesource.com/dawn).
+
+**[See it run in your browser: the pygfx examples, live, on wgpudawn.](https://www.markharfouche.com/wgpudawn/)**
 
 `wgpudawn` is the API of [wgpu-py](https://github.com/pygfx/wgpu-py) with
 Dawn (Google's WebGPU implementation, the one in Chrome) as its backend,

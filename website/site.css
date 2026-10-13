@@ -20,7 +20,7 @@
   --bad-soft: rgba(236, 129, 118, .12);
   --good: #6fcf97;
   --shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 18px 40px -18px rgba(0, 0, 0, .8);
-  --bar: rgba(9, 10, 12, .82);
+  --bar: rgba(9, 10, 12, .9);
   /* code */
   --c-comment: #6b7381;
   --c-string: #b5d08a;
@@ -55,7 +55,7 @@
     --bad-soft: rgba(176, 58, 46, .08);
     --good: #1f8a52;
     --shadow: 0 14px 30px -18px rgba(40, 30, 10, .35);
-    --bar: rgba(246, 245, 241, .85);
+    --bar: rgba(246, 245, 241, .92);
     --c-comment: #7d838d;
     --c-string: #3f7a1c;
     --c-number: #a8500f;
@@ -104,6 +104,7 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
   -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px);
   border-bottom: 1px solid var(--line);
 }
+.home .bar { position: static; }
 .bar .wrap { display: flex; align-items: center; gap: 16px; height: 56px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.015em; white-space: nowrap; }
 .brand .mark { width: 22px; height: 22px; color: var(--accent); }
@@ -130,6 +131,7 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
 .hero h1 { margin-top: 20px; font-size: clamp(2.5rem, 5.4vw, 4.6rem); line-height: .98; letter-spacing: -.045em; font-weight: 680; text-wrap: balance; }
 .hero h1 em { font-style: normal; color: var(--fg-3); }
+@media (prefers-color-scheme: dark) { .hero h1 em { color: #7f8896; } }
 .lede { margin-top: 22px; max-width: 34em; font-size: clamp(1rem, 1.25vw, 1.15rem); color: var(--fg-2); text-wrap: pretty; }
 .lede a { color: var(--fg); }
 
@@ -262,6 +264,7 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
 .switch input:checked + i { background: var(--accent); }
 .switch input:checked + i::after { transform: translateX(14px); }
 .switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 3px; }
+.switch .narrow { display: none; }
 .switch small { font: 12px var(--mono); color: var(--fg-3); }
 
 /* ------------------------------------------------------------------- grid */
@@ -341,8 +344,23 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
 .run main { padding: 24px 0 72px; }
 .stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: 28px clamp(24px, 3vw, 44px); align-items: start; }
 .viewer { min-width: 0; }
-.run .frame { aspect-ratio: 16 / 10; width: 100%; max-height: calc(100vh - 168px); min-height: 240px; }
-.run .frame:fullscreen { aspect-ratio: auto; max-height: none; border: 0; border-radius: 0; }
+/* The canvas has the shape of the window that the example asks for (--aspect,
+   width / height, set by run.html): some examples lay out for exactly that.
+   It is as wide as fits, and never taller than the viewport. */
+.run .frame {
+  aspect-ratio: var(--aspect, 1.6); margin-inline: auto;
+  width: min(100%, calc((100vh - 168px) * var(--aspect, 1.6)));
+}
+/* Full screen (Esc leaves it): the same shape, as large as the screen allows */
+.run .frame:fullscreen {
+  width: 100vw; height: 100vh; aspect-ratio: auto; margin: 0; border: 0; border-radius: 0; background: #000;
+}
+/* An example that asks for a window size gets a canvas of exactly that size
+   (some lay out in pixels), scaled to fit the frame: run.html sets these */
+.run .frame.fixed canvas {
+  inset: 0 auto auto 0; transform-origin: 0 0;
+  width: var(--canvas-w) !important; height: var(--canvas-h) !important;
+}
 .run .frame .poster { opacity: .28; filter: blur(14px) saturate(1.1); transform: scale(1.08); }
 .overlay {
   position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; justify-items: center; gap: 18px;
@@ -361,9 +379,19 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
 .overlay.failed .sign { background: rgba(236, 129, 118, .16); color: #ec8176; }
 .overlay.skipped .sign { background: rgba(255, 255, 255, .09); color: #c9cdd5; }
 .overlay.failed p, .overlay.skipped p { font-size: 16px; color: #fff; }
-.overlay .hint { font-size: 13.5px !important; color: #a3aab7 !important; }
+.overlay .hint { font-size: 14.5px !important; color: #b4bac5 !important; max-width: 38em; }
+.overlay.skipped #status { font-size: clamp(1.15rem, 2.2vw, 1.5rem); font-weight: 650; letter-spacing: -.02em; }
+.overlay.skipped .hint { font-size: clamp(.95rem, 1.5vw, 1.08rem) !important; color: #dfe2e8 !important; line-height: 1.5; }
 .overlay .hint:empty { display: none; }
 
+.toast {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 1; width: fit-content; max-width: calc(100% - 24px);
+  display: flex; align-items: flex-start; gap: 9px; padding: 9px 13px; border-radius: 9px;
+  background: rgba(22, 12, 11, .9); color: #f3c4be; border: 1px solid rgba(236, 129, 118, .35);
+  font-size: 13.5px; line-height: 1.4; pointer-events: none;
+}
+.toast .icon { font-size: 16px; margin-top: 1px; color: #ec8176; }
+.check .toast { display: none; }
 .under { display: flex; align-items: center; gap: 12px; margin-top: 12px; min-height: 34px; font-size: 13.5px; color: var(--fg-3); }
 .under .state { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
 .under .state > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -389,7 +417,13 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
 .facts dd.bad { color: var(--bad); }
 .meta .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
 .note { margin-top: 18px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-1); font-size: 13.5px; color: var(--fg-2); }
-.note b { color: var(--fg); font-weight: 600; }
+.note b { display: flex; align-items: center; gap: 8px; color: var(--fg); font-weight: 600; margin-bottom: 4px; }
+.note b::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); flex: none; }
+.note p { overflow-wrap: anywhere; }
+.note details { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.note summary { cursor: pointer; color: var(--fg-3); font-size: 13px; }
+.note summary:hover { color: var(--fg); }
+.note pre { margin-top: 10px; max-height: 260px; overflow: auto; font: 11.5px/1.5 var(--mono); color: var(--fg-2); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .panes { margin-top: 36px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-1); overflow: hidden; }
 .tabs { display: flex; align-items: center; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
@@ -427,9 +461,10 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
 .pager small { display: block; font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 7px; }
 .pager span { display: block; font-weight: 580; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* check.mjs takes its screenshots of the canvas: give it one size for all */
+/* check.mjs takes its screenshots of the canvas: give it one width for all */
 .check .stage { grid-template-columns: minmax(0, 1fr); }
-.check .frame { width: 960px; height: 600px; aspect-ratio: auto; max-height: none; border: 0; border-radius: 0; }
+/* (the shape is still the example's; the gallery crops its thumbnails) */
+.check .frame { width: 960px; aspect-ratio: var(--aspect, 1.6); border: 0; border-radius: 0; }
 
 /* ------------------------------------------------------------- responsive */
 
@@ -441,10 +476,18 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
   .foot .about { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
-  .bar .ghost span { display: none; }
+  .bar .ghost span, .bar .ghost.wide { display: none; }
   .bar .ghost.keep span { display: inline; }
   .bar .ghost { padding: 0 9px; }
   .tools .right { width: 100%; margin-left: 0; }
+  .tools .right { flex-wrap: nowrap; gap: 12px; }
+  .tools .wrap { gap: 8px; min-height: 0; }
+  .search { flex: 1 1 0; }
+  .search kbd { display: none; }
+  .search input { padding-right: 12px; }
+  .switch .wide { display: none; }
+  .switch .narrow { display: inline; }
+  .chips { width: calc(100% + 2 * var(--gutter)); margin: -4px calc(-1 * var(--gutter)); padding: 4px var(--gutter); }
   .grid { gap: 20px 12px; }
   .cap .name { font-size: 13.5px; }
   .thumb .tag.anim { display: none; }

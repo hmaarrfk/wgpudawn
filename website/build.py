@@ -70,6 +70,23 @@ UNAVAILABLE = {
 }
 
 
+# Example -> why it cannot run in a browser, where the reason is more specific
+# than the modules that it imports
+SKIP_REASONS = {
+    "other/integration_pytorch": (
+        "Trains in one process and renders in a second one (torch.multiprocessing); "
+        "a browser tab has no processes or threads for Python. It also needs libigl, "
+        "which has no build for WebAssembly. PyTorch itself only exists for Pyodide "
+        "as an unofficial, CPU-only build."
+    ),
+    "other/sam2_point_segmentation": (
+        "A Qt application that runs the SAM 2 model in a background thread and "
+        "downloads its PyTorch checkpoint at startup. Qt, threads and that download "
+        "are not available in a browser tab."
+    ),
+}
+
+
 def parse_example(path):
     with open(path, encoding="utf-8") as f:
         source = f.read()
@@ -102,8 +119,16 @@ def parse_example(path):
         m = re.search(rf"^# sphinx_gallery_pygfx_{name} = '(.*)'", source, re.M)
         return m.group(1) if m else ""
 
+    # The size of the window that the example asks for (logical pixels): the
+    # page gives the canvas that shape. 640x480 is the default of rendercanvas.
+    size = re.search(r"\bsize=\((\d+),\s*(\d+)\)", source)
+    width, height = (int(size.group(1)), int(size.group(2))) if size else (640, 480)
+
     return {
         "title": title,
+        "size": [width, height],
+        # Asked for explicitly: the example may lay out for exactly this size
+        "fixed_size": bool(size),
         "description": description,
         "lines": source.count("\n") + 1,
         "modules": top,
@@ -153,7 +178,7 @@ def collect_examples(examples_dir, pypi_by_import):
                         {pypi_by_import[m] for m in modules if m in pypi_by_import}
                     ),
                     "imports_examples": sorted(modules & (local_modules - {name[:-3]})),
-                    "skip": " ".join(skip),
+                    "skip": SKIP_REASONS.get(f"{category}/{name[:-3]}", " ".join(skip)),
                     # Why it does not work (yet), for the examples that are run
                     "note": notes.get(f"{category}/{name[:-3]}", ""),
                 }
@@ -216,7 +241,7 @@ def main():
     os.makedirs(os.path.join(out, "wheels"), exist_ok=True)
 
     # Static files
-    for name in ("index.html", "run.html", "site.css", "runner.js"):
+    for name in ("index.html", "run.html", "site.css", "runner.js", "logo.svg"):
         shutil.copy(os.path.join(HERE, name), os.path.join(out, name))
     open(os.path.join(out, ".nojekyll"), "w").close()
 
