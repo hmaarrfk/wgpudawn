@@ -2,7 +2,8 @@ name: CI
 
 # Lints, builds the sdist and one (abi3) wheel per platform with Dawn linked
 # in, tests the wheels (also by running the test suite of pygfx on top of
-# wgpudawn), and publishes to PyPI when a version tag is pushed.
+# wgpudawn), builds and deploys the website (the examples of pygfx running in
+# the browser), and publishes to PyPI when a version tag is pushed.
 
 on:
   workflow_dispatch:
@@ -25,7 +26,6 @@ permissions:
 env:
   PYODIDE_VERSION: "314.0.7"
   PYODIDE_BUILD_VERSION: "0.39.1"
-  PYGFX_REF: main
 
 jobs:
 
@@ -93,7 +93,10 @@ jobs:
       run: |
         tag=$(python -c "import re; print(re.search(r'^DAWN_TAG = \"(.+?)\"', open('build_cffi.py').read(), re.M).group(1))")
         prefix=$(python -c "import os; print(os.path.join(os.environ['RUNNER_TEMP'], 'dawn').replace(os.sep, '/'))")
+        # What the build of Dawn depends on, on this platform
+        config=$(python tools/build_dawn.py --print-config | python -c "import sys, hashlib; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest()[:16])")
         echo "tag=$tag" >> $GITHUB_OUTPUT
+        echo "config=$config" >> $GITHUB_OUTPUT
         echo "prefix=$prefix" >> $GITHUB_OUTPUT
         echo "DAWN_PREFIX=$prefix" >> $GITHUB_ENV
     - name: Restore Dawn from cache
@@ -101,7 +104,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ${{ steps.dawn.outputs.prefix }}
-        key: dawn-${{ steps.dawn.outputs.tag }}-${{ matrix.name }}-${{ hashFiles('tools/build_dawn.py', 'tools/build_dawn_manylinux.sh') }}
+        key: dawn-${{ steps.dawn.outputs.tag }}-${{ matrix.name }}-${{ matrix.os }}-${{ steps.dawn.outputs.config }}
     - name: Build Dawn (Linux, in the manylinux image)
       if: steps.dawn-cache.outputs.cache-hit != 'true' && runner.os == 'Linux'
       run: tools/build_dawn_manylinux.sh "$DAWN_PREFIX"
@@ -193,10 +196,13 @@ jobs:
     timeout-minutes: 30
     steps:
     - uses: actions/checkout@v4
+    - name: The pinned commit of pygfx (upstream.json)
+      id: pygfx
+      run: echo "ref=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['commit'])")" >> $GITHUB_OUTPUT
     - uses: actions/checkout@v4
       with:
         repository: pygfx/pygfx
-        ref: ${{ env.PYGFX_REF }}
+        ref: ${{ steps.pygfx.outputs.ref }}
         path: pygfx-src
     - uses: actions/download-artifact@v4
       with:
@@ -231,7 +237,8 @@ jobs:
     - name: Unit tests of pygfx
       run: |
         cd pygfx-src
-        pytest -v tests
+        # confcutdir: the checkout of pygfx is inside ours; not our conftest
+        pytest -v tests --confcutdir=$PWD
 
   pyodide:
     name: Pyodide (Emdawnwebgpu) in Node
@@ -262,6 +269,15 @@ jobs:
       with:
         name: dist-wheel-pyodide
         path: dist/*.whl
+    - name: Build freetype-py for Pyodide (for the website; pygfx needs it)
+      run: |
+        source ${PYODIDE_XBUILDENV_PATH}/${PYODIDE_VERSION}/emsdk/emsdk_env.sh
+        pip install cmake ninja
+        website/build_freetype.sh web-wheels
+    - uses: actions/upload-artifact@v4
+      with:
+        name: web-wheels
+        path: web-wheels/*.whl
     - uses: actions/setup-node@v4
       with:
         node-version: "26"
@@ -286,6 +302,75 @@ jobs:
           tests/test_util_compute.py tests/test_util_core.py tests/test_not_finite.py \
           tests/test_wgpu_compute_tex.py tests/test_wgpu_render.py \
           tests/test_wgpu_render_tex.py tests/test_wgpu_texture.py -k "not spirv"
+
+  website:
+    name: Website (pygfx examples in the browser)
+    needs: pyodide
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v4
+    - name: The pinned commit of pygfx (upstream.json)
+      id: pygfx
+      run: echo "ref=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['commit'])")" >> $GITHUB_OUTPUT
+    - uses: actions/checkout@v4
+      with:
+        repository: pygfx/pygfx
+        ref: ${{ steps.pygfx.outputs.ref }}
+        path: pygfx-src
+    - uses: actions/download-artifact@v4
+      with:
+        name: dist-wheel-pyodide
+        path: web-wheels
+    - uses: actions/download-artifact@v4
+      with:
+        name: web-wheels
+        path: web-wheels
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "24"
+    - name: Build the site
+      run: |
+        pip wheel --no-deps -w web-wheels ./pygfx-src
+        python website/build.py --pygfx pygfx-src --wheels web-wheels --out site
+        du -sh site
+    - name: Run every example in headless Chrome
+      run: |
+        # No GPU here: Chrome's WebGPU runs on SwiftShader. This records which
+        # examples work (results.json) and what they draw (shots/), which is
+        # what the gallery shows, and fails when an example that is known to
+        # work (website/expected.json) does not.
+        google-chrome --version
+        cd website && npm install --no-audit --no-fund
+        node check.mjs ../site --jobs 4 --timeout 300 --expect expected.json
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: website
+        path: site
+    - uses: actions/upload-pages-artifact@v3
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      with:
+        path: site
+
+  deploy-website:
+    name: Deploy the website
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: website
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+    - id: deployment
+      uses: actions/deploy-pages@v4
 
   publish:
     name: Publish to PyPI

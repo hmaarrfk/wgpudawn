@@ -28,4 +28,5 @@ ruff format . && ruff check . && pytest tests codegen
 ```
 
 To update Dawn: `/update-dawn`. To port a new wgpu-py release: `/sync-upstream`.
-Both release with the `release` argument.
+Both release with the `release` argument. To update the website (the pygfx
+examples running in the browser, `website/`): `/update-website`.

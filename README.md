@@ -37,6 +37,15 @@ The API is documented at https://wgpu-py.readthedocs.io; replace `wgpu` by
 `wgpudawn`. `wgpudawn.wgpu_py_version` is the version of wgpu-py that this
 version of wgpudawn mirrors.
 
+## In the browser
+
+**[The gallery](https://www.markharfouche.com/wgpudawn/)** runs the examples of
+[pygfx](https://github.com/pygfx/pygfx) in your browser, on wgpudawn: Pyodide,
+the Pyodide wheel of wgpudawn (which uses the WebGPU of the browser through
+Dawn's Emdawnwebgpu) and pygfx, unmodified. It needs a browser with WebGPU and
+JSPI, such as a recent Chrome or Edge. Every example is run in headless Chrome
+when the site is built; the gallery shows what works and what does not.
+
 ## Status
 
 Early. The wgpu-py tests that do not depend on wgpu-native specifics pass, and
@@ -93,7 +102,7 @@ Wheels are built for:
 
 There is also a wheel for [Pyodide](https://pyodide.org) (Pyodide 314, i.e.
 Python 3.14): there, the same bindings run on the WebGPU of the browser, via
-Dawn's Emdawnwebgpu. `demo/` is a page that uses it.
+Dawn's Emdawnwebgpu. The gallery above uses it; `website/` builds it.
 
 ## Building from source
 
@@ -141,6 +150,7 @@ skills that are part of this repository:
 ```sh
 claude "/update-dawn release"       # to the latest Dawn release, verify, release X.Y.Z.N+1
 claude "/sync-upstream release"     # port a new wgpu-py release, verify, release X.Y.Z.0
+claude "/update-website"            # newer pygfx on the website; check every example; deploy
 ```
 
 Without `release`, they stop before tagging. See `.claude/skills/`.

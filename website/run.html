@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wgpudawn example</title>
+<link rel="stylesheet" href="site.css">
+</head>
+<body class="run">
+<header class="bar">
+  <a class="brand" href="./">wgpudawn <span>gallery</span></a>
+  <nav>
+    <a id="prev" class="step" href="#">&larr; <span></span></a>
+    <a id="next" class="step" href="#"><span></span> &rarr;</a>
+  </nav>
+</header>
+<main>
+  <section class="stage">
+    <div class="frame">
+      <canvas id="canvas"></canvas>
+      <div id="overlay" class="overlay"><div class="spinner"></div><p id="status">Loading</p></div>
+    </div>
+    <div class="meta">
+      <p class="category" id="category"></p>
+      <h1 id="title"></h1>
+      <p id="description"></p>
+      <p class="links">
+        <a id="github" target="_blank" rel="noopener">Source on GitHub</a>
+        <span id="adapter"></span>
+      </p>
+    </div>
+  </section>
+  <section class="panes">
+    <details open>
+      <summary>Source <span id="lines"></span></summary>
+      <pre id="source" class="code"></pre>
+    </details>
+    <details id="log-pane">
+      <summary>Output</summary>
+      <pre id="log" class="code"></pre>
+    </details>
+  </section>
+</main>
+<script type="module">
+import { runExample, supportsWebGPU, supportsJSPI } from './runner.js';
+
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const check = params.has('check');  // check.mjs: report the result on the console
+const manifest = await (await fetch('examples.json')).json();
+const examples = manifest.examples;
+const index = Math.max(0, examples.findIndex((e) => e.id === params.get('ex')));
+const example = examples[index];
+
+document.title = `${example.title} - wgpudawn`;
+$('title').textContent = example.title;
+$('description').textContent = example.description;
+$('category').textContent = manifest.categories.find((c) => c.id === example.category).title;
+$('lines').textContent = `${example.lines} lines`;
+$('github').href = `https://github.com/pygfx/pygfx/blob/${manifest.versions.pygfx_commit}/examples/${example.id}.py`;
+for (const [id, other] of [['prev', examples[index - 1]], ['next', examples[index + 1]]]) {
+  if (!other) { $(id).hidden = true; continue; }
+  $(id).href = `run.html?ex=${encodeURIComponent(other.id)}`;
+  $(id).querySelector('span').textContent = other.title;
+}
+fetch(`src/${example.id}.py`).then((r) => r.text()).then((text) => { $('source').textContent = text; });
+
+let failed = false;
+function log(text, kind) {
+  if (kind === 'status') {
+    $('status').textContent = text;
+    $('overlay').hidden = !text;
+    return;
+  }
+  $('log').textContent += text + '\n';
+  if (kind === 'err' && /Traceback|Error/.test(text)) {
+    failed = true;
+    $('log-pane').open = true;
+  }
+}
+function fail(message, detail) {
+  $('overlay').hidden = false;
+  $('overlay').classList.add('failed');
+  $('status').textContent = message;
+  if (detail) { $('log').textContent += detail + '\n'; $('log-pane').open = true; }
+  if (check) console.log('EXAMPLE FAIL: ' + message + (detail ? '\n' + detail : ''));
+}
+
+if (example.skip) {
+  fail(`This example cannot run in a browser: it ${example.skip}.`);
+} else if (!supportsWebGPU()) {
+  fail('This browser does not have WebGPU. Try a recent Chrome or Edge.');
+} else {
+  if (!supportsJSPI()) {
+    log('This browser has no JSPI (WebAssembly stack switching), which the blocking parts of the API need. Recent Chrome and Edge have it.', 'err');
+  }
+  try {
+    await runExample(manifest, example, { log });
+    // Let it draw a few frames; errors while drawing end up in the log
+    await new Promise((resolve) => setTimeout(resolve, check ? 2500 : 0));
+    if (check) console.log(failed ? 'EXAMPLE FAIL: error while drawing\n' + $('log').textContent : 'EXAMPLE OK');
+  } catch (err) {
+    const text = String(err);
+    const last = text.trim().split('\n').pop();
+    fail(last.length < 200 ? last : 'The example raised an error.', text);
+  }
+}
+</script>
+</body>
+</html>

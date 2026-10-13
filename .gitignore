@@ -5,6 +5,8 @@ wgpudawn/_lib/_wgpu_dawn.*
 wgpudawn/_lib/emdawn_glue.js
 tests/pyodide/node_modules/
 tests/pyodide/package-lock.json
+website/node_modules/
+website/package-lock.json
 .dawn/
 
 # Byte-compiled / optimized / DLL files

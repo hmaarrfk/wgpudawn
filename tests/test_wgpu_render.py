@@ -3,6 +3,7 @@ Test render pipeline, by drawing a whole lot of orange squares ...
 """
 
 import ctypes
+import platform
 
 import numpy as np
 import sys
@@ -11,7 +12,13 @@ import pytest
 
 import wgpudawn as wgpu
 from pytest import skip
-from testutils import run_tests, can_use_wgpu_lib, is_ci, get_default_device
+from testutils import (
+    run_tests,
+    can_use_wgpu_lib,
+    is_ci,
+    get_default_device,
+    adapter_summary,
+)
 from renderutils import render_to_texture
 from renderutils import render_to_screen  # noqa: F401 - sometimes used for debugging
 
@@ -532,6 +539,11 @@ def test_render_orange_square_with_depth(depth_stencil_tex_format, use_render_bu
 @pytest.mark.parametrize("use_render_bundle", [True, False])
 def test_render_orange_dots(use_render_bundle):
     """Render four orange dots and check that there are four orange square dots."""
+
+    if "Apple Paravirtual" in adapter_summary and platform.machine() == "x86_64":
+        pytest.skip(
+            "The virtual GPU of Intel macOS CI runners rasterizes points elsewhere"
+        )
 
     device = get_default_device()
 

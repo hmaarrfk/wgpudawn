@@ -167,6 +167,11 @@ def test_default_device_configure_label():
 
 
 def test_default_device_configure_required_features(caplog):
+    wanted = {"timestamp-query", "float32-filterable", "shader-f16"}
+    missing = wanted - set(wgpu.gpu.request_adapter_sync().features)
+    if missing:
+        pytest.skip(f"The adapter does not have {missing}")
+
     helper = DefaultDeviceHelper()
 
     # Configure

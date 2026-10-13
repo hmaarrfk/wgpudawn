@@ -70,12 +70,20 @@ def get_cmake_args(prefix):
     if sys.platform.startswith("win"):
         # Use the same (dynamic, release) C runtime as CPython extensions
         args += ["-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL"]
+        # Load d3dcompiler_47.dll and vulkan-1.dll from the system directory.
+        # By default Dawn looks next to the executable (as Chrome ships them).
+        args += ["-DDAWN_FORCE_SYSTEM_COMPONENT_LOAD=ON"]
     return args
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--prefix", required=True, help="Where to install Dawn")
+    parser.add_argument("--prefix", help="Where to install Dawn")
+    parser.add_argument(
+        "--print-config",
+        action="store_true",
+        help="Print what determines the build on this platform (for cache keys)",
+    )
     parser.add_argument(
         "--work-dir",
         default=os.path.join(ROOT, "build", "dawn"),
@@ -88,6 +96,11 @@ def main():
     args, extra_cmake_args = parser.parse_known_args()
 
     tag = get_dawn_tag()
+    if args.print_config:
+        print(tag, *get_cmake_args("PREFIX"), *extra_cmake_args)
+        return
+    if not args.prefix:
+        parser.error("--prefix is required")
     prefix = os.path.abspath(args.prefix)
     stamp = os.path.join(prefix, "DAWN_VERSION")
     if os.path.isfile(stamp) and open(stamp).read().strip() == tag:

@@ -1,0 +1,16 @@
+{
+  "version": "314.0.7",
+  "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/",
+  "pypi_always": [
+    "rendercanvas",
+    "pylinalg",
+    "hsluv",
+    "uharfbuzz"
+  ],
+  "pypi_by_import": {
+    "imgui_bundle": "imgui-bundle==1.92.900",
+    "trimesh": "trimesh",
+    "gltflib": "gltflib",
+    "observ": "observ"
+  }
+}

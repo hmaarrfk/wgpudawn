@@ -1,0 +1,9 @@
+{
+  "name": "wgpudawn-website",
+  "private": true,
+  "type": "module",
+  "description": "Check the examples of the website in headless Chrome",
+  "dependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

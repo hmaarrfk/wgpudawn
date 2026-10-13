@@ -11,5 +11,10 @@
   "dawn": {
     "repository": "https://github.com/google/dawn",
     "tag": "v20260929.200159"
+  },
+  "pygfx": {
+    "repository": "https://github.com/pygfx/pygfx",
+    "commit": "5d6e2c88c178b6446ab74729edbe3de576f6036b",
+    "note": "The commit whose test suite CI runs on wgpudawn, and whose examples the website shows."
   }
 }

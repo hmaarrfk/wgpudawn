@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wgpudawn: the pygfx examples, live in your browser</title>
+<meta name="description" content="A gallery of the pygfx examples, running in your browser on Dawn's WebGPU through wgpudawn, a Python package.">
+<meta name="theme-color" content="#090a0c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffa24a' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M3 18h18M6.5 18a5.5 5.5 0 0 1 11 0M12 5v3M4.6 9.6l2 2M19.4 9.6l-2 2'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="site.css">
+</head>
+<body class="home">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-mark" viewBox="0 0 24 24"><path d="M3 18h18M6.5 18a5.5 5.5 0 0 1 11 0M12 5v3M4.6 9.6l2 2M19.4 9.6l-2 2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="9.5" r="1.2"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.5h18.4zM12 10v4.5M12 17.2v.1"/></symbol>
+  <symbol id="i-desktop" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="1.6"/><path d="M8.5 20h7M12 16.5V20"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="wgpudawn gallery, home">
+      <svg class="icon mark"><use href="#i-mark"/></svg>wgpudawn <span>gallery</span>
+    </a>
+    <nav aria-label="Project">
+      <a class="ghost" href="https://pypi.org/project/wgpudawn/" target="_blank" rel="noopener"><code>pip install wgpudawn</code></a>
+      <a class="ghost keep" href="https://github.com/hmaarrfk/wgpudawn" target="_blank" rel="noopener" aria-label="wgpudawn on GitHub"><svg class="icon"><use href="#i-github"/></svg><span>GitHub</span></a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div class="pitch">
+        <p class="eyebrow">Python &middot; WebGPU &middot; Dawn</p>
+        <h1 id="hero-title">The pygfx examples, <em>live in your browser.</em></h1>
+        <p class="lede">
+          Every picture below is an example of <a class="link" href="https://github.com/pygfx/pygfx" target="_blank" rel="noopener">pygfx</a>,
+          drawn by Dawn, the WebGPU of your browser, through
+          <a class="link" href="https://github.com/hmaarrfk/wgpudawn" target="_blank" rel="noopener">wgpudawn</a>, a Python package.
+          Open one and the unmodified Python source runs right here. There is no server.
+        </p>
+
+        <div class="tally" id="tally" hidden>
+          <p class="num"><strong id="tally-num"></strong><span class="what" id="tally-what"></span></p>
+          <div class="meter" id="meter" role="img"></div>
+          <p class="legend" id="legend"></p>
+        </div>
+
+        <p class="cta">
+          <a class="btn primary" href="#gallery">Browse the gallery <svg class="icon"><use href="#i-down"/></svg></a>
+          <a class="btn" href="https://github.com/hmaarrfk/wgpudawn" target="_blank" rel="noopener"><svg class="icon"><use href="#i-github"/></svg> hmaarrfk/wgpudawn</a>
+        </p>
+        <ul class="versions" id="versions" aria-label="Versions"></ul>
+      </div>
+
+      <figure class="live" id="live" hidden>
+        <div class="frame">
+          <img class="poster" id="poster" alt="" width="960" height="600" hidden>
+          <canvas id="canvas" aria-hidden="true"></canvas>
+          <a class="cover" id="live-cover" style="position:absolute;inset:0;z-index:1"></a>
+          <button class="play" id="play" type="button" hidden><svg class="icon"><use href="#i-play"/></svg> Run it live</button>
+        </div>
+        <figcaption>
+          <span class="pill" id="live-pill">Screenshot</span>
+          <span class="t" id="live-title"></span>
+          <span class="s" id="live-status" aria-live="polite"></span>
+          <a class="go" id="live-go">Open <svg class="icon"><use href="#i-right"/></svg></a>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <div class="tools" id="gallery">
+    <div class="wrap">
+      <div class="chips" id="chips" role="group" aria-label="Category"></div>
+      <div class="right">
+        <label class="search">
+          <span class="sr">Search the examples</span>
+          <svg class="icon"><use href="#i-search"/></svg>
+          <input id="q" type="search" placeholder="Search examples" autocomplete="off" spellcheck="false">
+          <kbd aria-hidden="true">/</kbd>
+        </label>
+        <label class="switch" id="off-switch" hidden>
+          <input id="off" type="checkbox" checked>
+          <i aria-hidden="true"></i>
+          <span>Show what does not run</span> <small id="off-count"></small>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <section class="gallery" aria-label="Examples">
+    <div class="wrap">
+      <p class="sr" id="count" aria-live="polite"></p>
+      <div id="groups"></div>
+      <div class="none" id="none" hidden>
+        <strong id="none-what"></strong>
+        <span>Try another word, or another category.</span><br>
+        <button class="btn small" id="reset" type="button">Show all examples</button>
+      </div>
+      <noscript><p class="none">The gallery needs JavaScript (and the examples need WebGPU).</p></noscript>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="about">
+      <a class="brand" href="./"><svg class="icon mark"><use href="#i-mark"/></svg>wgpudawn</a>
+      <p>
+        wgpudawn is a Dawn reference implementation that follows the architecture and design of
+        <a class="link" href="https://github.com/pygfx/wgpu-py" target="_blank" rel="noopener">wgpu-py</a>:
+        the same Python API for WebGPU, with Dawn (the WebGPU implementation of Chrome) as its backend.
+        All credit for the API and its design goes to the authors of wgpu-py.
+        This project is maintained by AI agents.
+      </p>
+      <p>
+        The examples are those of <a class="link" href="https://github.com/pygfx/pygfx" target="_blank" rel="noopener">pygfx</a>,
+        unmodified, with credit and thanks to its authors.
+      </p>
+    </div>
+    <div>
+      <h3>Project</h3>
+      <ul>
+        <li><a class="link" href="https://github.com/hmaarrfk/wgpudawn" target="_blank" rel="noopener">hmaarrfk/wgpudawn</a></li>
+        <li><a class="link" href="https://github.com/pygfx/wgpu-py" target="_blank" rel="noopener">pygfx/wgpu-py</a></li>
+        <li><a class="link" href="https://github.com/pygfx/pygfx" target="_blank" rel="noopener">pygfx/pygfx</a></li>
+        <li><a class="link" href="https://dawn.googlesource.com/dawn" target="_blank" rel="noopener">Dawn</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Your browser</h3>
+      <p id="browser">The examples need WebGPU, and the blocking parts of the API need JSPI (WebAssembly stack switching). Recent versions of Chrome and Edge have both.</p>
+    </div>
+    <p class="fine" id="fine">Python runs in Pyodide, in this page.</p>
+  </div>
+</footer>
+
+<script type="module">
+import { runExample, supportsWebGPU, supportsJSPI } from './runner.js';
+
+const $ = (id) => document.getElementById(id);
+const SVG = 'http://www.w3.org/2000/svg';
+function h(tag, attrs, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === false || v == null) continue;
+    if (k === 'class') el.className = v; else el.setAttribute(k, v === true ? '' : v);
+  }
+  el.append(...children.filter((c) => c != null));
+  return el;
+}
+function icon(name) {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('class', 'icon');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(SVG, 'use');
+  use.setAttribute('href', '#i-' + name);
+  svg.append(use);
+  return svg;
+}
+
+const manifest = await (await fetch('examples.json')).json();
+// What check.mjs found. Without it, nothing is claimed about what works.
+let results = null;
+try {
+  const response = await fetch('results.json');
+  if (response.ok) results = (await response.json()).examples || null;
+} catch { /* no results */ }
+
+// ------------------------------------------------------------ the examples
+
+function lastLine(text) {
+  const lines = String(text || '').trim().split('\n').map((l) => l.trim()).filter(Boolean);
+  return (lines.pop() || 'It raised an error.').replace(/: Runtime\.\w+ timed out.*$/, '.');
+}
+const examples = manifest.examples.map((example) => {
+  const result = results && results[example.id];
+  // skip: why it cannot run in any browser; note: why it does not work yet
+  let state = 'unknown', reason = '';
+  if (example.skip) {
+    state = 'skip';
+    reason = example.skip;
+  } else if (example.note || (result && !result.ok)) {
+    state = 'fail';  // also when the (maybe stale) results say that it ran
+    reason = example.note || lastLine(result.error);
+  } else if (result) {
+    state = 'ok';
+  }
+  return {
+    ...example, state, reason,
+    shot: result && result.ok && result.shot ? result.shot : '',
+    url: `run.html?ex=${encodeURIComponent(example.id)}`,
+    text: `${example.title} ${example.name} ${example.id} ${example.description}`.toLowerCase(),
+  };
+});
+const byState = (state) => examples.filter((e) => e.state === state).length;
+const total = examples.length;
+const n = { ok: byState('ok'), fail: byState('fail'), skip: byState('skip'), unknown: byState('unknown') };
+const isOff = (e) => e.state === 'fail' || e.state === 'skip';
+
+// ------------------------------------------------------------------- hero
+
+if (results) {
+  $('tally-num').append(String(n.ok), h('small', null, `of ${total}`));
+  $('tally-what').textContent = 'examples run in the browser';
+  const parts = [['ok', n.ok, 'run'], ['fail', n.fail, 'do not work yet'], ['skip', n.skip, 'cannot run in a browser'], ['unknown', n.unknown, 'not checked']]
+    .filter(([, count]) => count);
+  for (const [cls, count, label] of parts) {
+    $('meter').append(h('i', { class: cls, style: `flex:${count}` }));
+    $('legend').append(h('span', { class: cls }, `${count} ${label}`));
+  }
+  $('meter').setAttribute('aria-label', parts.map(([, count, label]) => `${count} ${label}`).join(', '));
+} else {
+  $('tally-num').textContent = String(total);
+  $('tally-what').textContent = 'examples';
+  $('meter').hidden = true;
+}
+$('tally').hidden = false;
+
+const v = manifest.versions;
+const short = (sha) => String(sha || '').slice(0, 7);
+const versions = [
+  ['wgpudawn', v.wgpudawn, v.wgpudawn_commit && `https://github.com/hmaarrfk/wgpudawn/tree/${v.wgpudawn_commit}`],
+  ['Dawn', v.dawn],
+  ['pygfx', [v.pygfx, v.pygfx_commit && '@ ' + short(v.pygfx_commit)].filter(Boolean).join(' '),
+    v.pygfx_commit && `https://github.com/pygfx/pygfx/tree/${v.pygfx_commit}`],
+  ['wgpu-py API', v.wgpu_py],
+  ['Pyodide', manifest.pyodide.version],
+];
+for (const [name, value, href] of versions) {
+  if (!value) continue;
+  const inner = [h('b', null, name), value];
+  $('versions').append(h('li', null, href ? h('a', { href, target: '_blank', rel: 'noopener' }, ...inner) : inner[0], href ? null : value));
+}
+$('fine').textContent = `Built from wgpudawn ${v.wgpudawn} (Dawn ${v.dawn}, the API of wgpu-py ${v.wgpu_py}) and pygfx ${v.pygfx}. `
+  + `Python runs in Pyodide ${manifest.pyodide.version}, in this page.`;
+
+const webgpu = supportsWebGPU();
+const jspi = supportsJSPI();
+if (!webgpu) {
+  $('browser').textContent = 'This browser does not have WebGPU, so the examples cannot run here: you are looking at screenshots. Recent versions of Chrome and Edge have it.';
+} else if (!jspi) {
+  $('browser').textContent = 'This browser has WebGPU, but not JSPI (WebAssembly stack switching), which the blocking parts of the API need: some examples will not run. Recent versions of Chrome and Edge have both.';
+}
+
+// One example runs live in the hero: light, animated, and known to work.
+const WISHES = ['feature_demo/skinned_mesh', 'feature_demo/mesh_toon2', 'feature_demo/morph_targets',
+  'feature_demo/look_at_instanced', 'feature_demo/text_waterfall', 'introductory/cube'];
+const light = (e) => e.animated && !e.needs_data && !e.pypi.length && !e.imageio.length;
+const hero = WISHES.map((id) => examples.find((e) => e.id === id && e.state === 'ok')).find(Boolean)
+  || examples.find((e) => e.state === 'ok' && light(e))
+  || (!results && WISHES.map((id) => examples.find((e) => e.id === id && !e.skip)).find(Boolean))
+  || examples.find((e) => e.shot);
+if (hero) {
+  const live = $('live');
+  const say = (pill, cls, status) => {
+    $('live-pill').textContent = pill;
+    $('live-pill').className = 'pill ' + cls;
+    $('live-status').textContent = status;
+  };
+  live.hidden = false;
+  $('live-title').textContent = hero.title;
+  $('live-cover').href = $('live-go').href = hero.url;
+  $('live-cover').setAttribute('aria-label', `Open the example: ${hero.title}`);
+  if (hero.shot) {
+    $('poster').src = hero.shot;
+    $('poster').hidden = false;
+    $('poster').onerror = () => { $('poster').hidden = true; };
+  }
+  say(hero.shot ? 'Screenshot' : 'Example', '', webgpu ? '' : 'No WebGPU in this browser');
+
+  let started = false;
+  const start = async () => {
+    if (started) return;
+    started = true;
+    $('play').hidden = true;
+    say('Starting', 'busy', 'Loading Pyodide');
+    try {
+      await runExample(manifest, hero, {
+        log: (text, kind) => {
+          if (kind === 'status') { if (text) $('live-status').textContent = text; } else console.debug(text);
+        },
+      });
+      live.classList.add('running');
+      say('Live', 'on', '');
+    } catch (err) {
+      console.warn(err);
+      say(hero.shot ? 'Screenshot' : 'Example', '', 'It could not start here');
+    }
+  };
+  if (webgpu) {
+    // Start by itself where that is cheap and welcome; otherwise offer a button.
+    const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const frugal = navigator.connection && navigator.connection.saveData;
+    const roomy = matchMedia('(min-width: 981px)').matches;
+    $('play').onclick = start;
+    if (jspi && !calm && !frugal && roomy) {
+      const idle = window.requestIdleCallback || ((f) => setTimeout(f, 600));
+      const seen = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        seen.disconnect();
+        const go = () => idle(start, { timeout: 3000 });
+        if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });
+      }, { threshold: 0.4 });
+      seen.observe(live);
+    } else {
+      $('play').hidden = false;
+    }
+  }
+}
+
+// ---------------------------------------------------------------- gallery
+
+function card(e) {
+  const off = isOff(e);
+  const thumb = h('span', { class: 'thumb' + (e.shot ? '' : ' empty') });
+  const blank = () => {
+    thumb.classList.add('empty');
+    thumb.querySelector('img')?.remove();
+    thumb.prepend(icon('image'));
+  };
+  if (e.shot) {
+    const img = h('img', { src: e.shot, alt: '', loading: 'lazy', decoding: 'async', width: 960, height: 600 });
+    img.addEventListener('error', blank);
+    img.addEventListener('load', () => { if (img.naturalWidth < 16) blank(); });  // an empty canvas
+    thumb.append(img);
+  } else {
+    thumb.append(icon(e.state === 'skip' ? 'desktop' : e.state === 'fail' ? 'alert' : 'image'));
+  }
+  if (e.state === 'fail') thumb.append(h('span', { class: 'tag' }, 'Not yet'));
+  else if (e.state === 'skip') thumb.append(h('span', { class: 'tag' }, 'Desktop only'));
+  else if (e.animated) thumb.append(h('span', { class: 'tag anim' }, icon('play'), 'Animated'));
+  const hover = off ? e.reason : e.description;
+  if (hover) thumb.append(h('span', { class: 'desc' }, h('span', null, hover)));
+  const el = h('a', { class: `card ${e.state}` + (off ? ' off' : ''), href: e.url },
+    thumb,
+    h('span', { class: 'cap' },
+      h('span', { class: 'name' }, e.title),
+      h('span', { class: 'sub' }, off ? e.reason : `${e.name}.py`)));
+  if (off) el.setAttribute('aria-label', `${e.title}. ${e.state === 'skip' ? 'Cannot run in a browser' : 'Does not work yet'}. ${e.reason}`);
+  e.el = el;
+  return el;
+}
+
+// Per category: what works first, what does not at the end.
+const rank = { ok: 0, unknown: 1, fail: 2, skip: 3 };
+const groups = manifest.categories.map((category) => {
+  const members = examples.filter((e) => e.category === category.id);
+  if (!members.length) return null;
+  const ordered = [...members].sort((a, b) => rank[a.state] - rank[b.state]);
+  const count = h('span');
+  const el = h('section', { class: 'group', id: 'c-' + category.id },
+    h('header', null, h('h2', null, category.title), count),
+    h('div', { class: 'grid' }, ...ordered.map(card)));
+  $('groups').append(el);
+  return { ...category, members, el, count };
+}).filter(Boolean);
+
+const chips = [{ id: 'all', title: 'All', members: examples }, ...groups].map((group) => {
+  const count = h('small');
+  const el = h('button', { class: 'chip', type: 'button', 'aria-pressed': 'false' }, group.title, count);
+  el.addEventListener('click', () => { state.c = group.id; apply(); });
+  $('chips').append(el);
+  return { ...group, chip: el, chipCount: count };
+});
+
+const offTotal = n.fail + n.skip;
+if (offTotal) {
+  $('off-switch').hidden = false;
+  $('off-count').textContent = String(offTotal);
+}
+
+const query = new URLSearchParams(location.search);
+const state = {
+  c: chips.some((c) => c.id === query.get('c')) ? query.get('c') : 'all',
+  q: query.get('q') || '',
+  off: query.get('off') !== '0',
+};
+$('q').value = state.q;
+$('off').checked = state.off;
+
+function apply() {
+  const words = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const passes = (e) => (state.off || !isOff(e)) && words.every((w) => e.text.includes(w));
+  let shown = 0;
+  for (const e of examples) e.match = passes(e);
+  for (const group of groups) {
+    const inCategory = state.c === 'all' || state.c === group.id;
+    let visible = 0;
+    for (const e of group.members) {
+      const show = inCategory && e.match;
+      e.el.hidden = !show;
+      if (show) visible += 1;
+    }
+    group.el.hidden = !visible;
+    group.count.textContent = String(visible);
+    shown += visible;
+  }
+  for (const chip of chips) {
+    chip.chip.setAttribute('aria-pressed', String(chip.id === state.c));
+    chip.chipCount.textContent = String(chip.members.filter((e) => e.match).length);
+  }
+  $('count').textContent = `${shown} example${shown === 1 ? '' : 's'} shown`;
+  $('none').hidden = shown > 0;
+  $('none-what').textContent = state.q ? `Nothing matches “${state.q}”` : 'Nothing to show here';
+
+  const params = new URLSearchParams();
+  if (state.c !== 'all') params.set('c', state.c);
+  if (state.q) params.set('q', state.q);
+  if (!state.off) params.set('off', '0');
+  const search = params.toString();
+  history.replaceState(null, '', (search ? '?' + search : location.pathname) + location.hash);
+}
+
+$('q').addEventListener('input', () => { state.q = $('q').value.trim(); apply(); });
+$('off').addEventListener('change', () => { state.off = $('off').checked; apply(); });
+$('reset').addEventListener('click', () => {
+  state.c = 'all'; state.q = ''; state.off = true;
+  $('q').value = ''; $('off').checked = true;
+  apply();
+});
+addEventListener('keydown', (event) => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+  if (event.key === '/' && !typing && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    $('q').focus();
+    $('q').select();
+  } else if (event.key === 'Escape' && document.activeElement === $('q')) {
+    $('q').value = ''; state.q = ''; apply();
+    $('q').blur();
+  }
+});
+apply();
+if (location.hash === '#gallery' || query.has('c') || query.has('q')) $('gallery').scrollIntoView();
+</script>
+</body>
+</html>
