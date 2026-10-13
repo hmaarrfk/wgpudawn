@@ -72,6 +72,20 @@ in parentheses.
   (pygfx shaders that Dawn rejects), do not paper over it: record it with the
   rule and the fix, and show it as a known failure. (2026-10-12)
 
+* Never cut the output of the command that decides whether to push. A check
+  whose last two lines were all that was read had crashed at start. Read the
+  exit code and the summary line, or do not push. (2026-10-12)
+* Look at the product, not only at its tests. The first deployment had black
+  thumbnails while every job was green, because nothing asserted that a
+  picture shows something. Add the assertion when you find such a gap (the
+  checker now refuses a mostly black gallery). (2026-10-12)
+* When a fix for an environment you cannot see fails twice, change the
+  approach instead of guessing a third time: pictures that need a GPU are
+  taken where there is one, and kept in the repository. (2026-10-12)
+* Measure before and after, with a harness that stays: "fast" became
+  `check.mjs --warm`, which reports click-to-first-frame for every example and
+  fails when warm and cold disagree. (2026-10-12)
+
 **Using several agents**
 
 * Parallelize by ownership of files, not by topic: one agent owned three
@@ -98,3 +112,87 @@ in parentheses.
 ## Sessions
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
+
+## 2026-10-13 - Creating the project: package, wheels, website, maintenance
+
+| | |
+|---|---|
+| Session | `7a75407f-39ea-41af-b578-d4d4c430723c` |
+| When (UTC) | 2026-10-13T00:51:56+00:00 to 2026-10-13T05:17:59+00:00 |
+| Duration | 4.43 h wall clock, 3.59 h agent working |
+| Human prompts | 26 (1288 words) |
+| Subagents | 6 |
+| Model | `claude-opus-5-5` (Anthropic): 506 requests; tokens: 1,088 input, 310,952 output, 148,252,520 cache read, 3,536,259 cache write; $55.55 at API list prices |
+| API-equivalent cost | $55.55 (estimate; see tools/session_stats.py) |
+
+**What the human asked for** (paraphrased, in order)
+
+1. Turn the declined pull request pygfx/wgpu-py#840 into a standalone, co-installable
+   package `wgpudawn`: version from git tags, wheels for Windows, macOS and Linux on
+   x86-64 and arm64, tested by running pygfx's test suite through a test-only `wgpu` shim.
+2. Mirror wgpu-py's versions so that it is a drop-in replacement, and write skills so that
+   one command keeps the project up to date.
+3. Say in the README what the project is: a Dawn reference implementation after wgpu-py's
+   design, maintained by AI agents.
+4. Publish the Pyodide wheel too. (PyPI was pre-registered by the human.)
+5. How to get around rendercanvas and pygfx importing `wgpu` by name?
+6. A dedicated skill for following Dawn aggressively; versions as X.Y.Z.N.
+7. A github.io site with pygfx's examples running in the browser; a skill for it; make it
+   sleek and visual; find out whether imgui-bundle and PyTorch can run there.
+8. Explain, per example, why it cannot run.
+9. A work log with practices, in the repository, maintained by the agents.
+10. Review the maintenance tasks, write a skill for each and one that runs them all.
+11. Feedback on the first deployment: highlighting, aspect ratios, full screen; make the
+    sun the logo.
+12. Help diagnose an iPhone on which the examples spin forever.
+13. Make navigating between examples fast; the pages need not be real pages.
+
+**What was delivered**
+
+* The package: wgpu-py 0.32.0 (+6 commits) with the Dawn backend of #840, Dawn
+  v20260929.200159 linked statically, one abi3 wheel per platform (6) plus a Pyodide
+  wheel; `wgpudawn.install_as_wgpu()`; 226 tests; pygfx's 354 unit tests pass on it.
+  First fully green CI on all platforms: run 38335939446; with the website as it is now: run 38349679065.
+* The website, https://www.markharfouche.com/wgpudawn/ : 186 of 214 pygfx examples run in
+  the browser (imgui included); 14 do not work yet and 14 cannot run in a browser, each
+  with its reason. One interpreter for the whole visit: 108 ms median from click to first
+  frame (was 2.3 to 4.6 s). `diagnose.html` tests a browser step by step.
+* Nine skills (`maintain`, `update-dawn`, `sync-upstream`, `update-website`, `ci-doctor`,
+  `release`, `refresh-infra`, `triage`, `upstream-report`), `tools/maintenance_status.py`,
+  `tools/update_dawn.py`, `tools/upstream_diff.py`, and this log with
+  `tools/session_stats.py`.
+* Commits beef83d to 8327285 on `main`. Six subagents: two research (imgui-bundle: a
+  wheel for our Pyodide exists on PyPI; PyTorch: possible but not useful here), the site's
+  design, native debugging of failing examples, the maintenance review, and the fast
+  navigation.
+
+**What went wrong, and how it was found**
+
+* CI, first runs: Xcode 15 cannot compile Dawn (moved the build to macos-15); Windows could
+  not load `d3dcompiler_47.dll` (`DAWN_FORCE_SYSTEM_COMPONENT_LOAD`); macOS runners lack
+  timestamp queries; pytest picked up two conftests in the pygfx job. All only visible on
+  the runners.
+* The example checker reported 193 working examples when 186 were: GPU validation errors
+  arrive asynchronously in a browser and nothing listened. Found by running the same
+  examples natively. The seven are pygfx shaders and layouts that Dawn rejects per the
+  WGSL and WebGPU specs.
+* A push without having seen the check pass: I had cut the checker's output to two lines,
+  which hid a crash at start-up that I had just introduced (binding its server to
+  127.0.0.1). The website job failed; fixed in the next commit.
+* The first deployment had black thumbnails, and nobody had looked: without a GPU, Chrome
+  leaves a WebGPU canvas black. Two attempts to fix it on the runner failed (software
+  compositing flags; reading the canvas back in the page). The pictures are now taken on a
+  GPU and kept in the repository; the checker refuses a mostly black gallery.
+
+**Open**
+
+* No release yet: the first tag (a release candidate) is the human's to push, or to ask
+  for (`/release`).
+* iPhone/Safari: Pyodide reports a fatal error at the first JSPI stack switch. The site now
+  avoids that switch on import and shows the error; a report from `diagnose.html` on the
+  phone is needed to say more.
+* Reports for pygfx (in `website/notes.json`): `textureSample` in non-uniform control flow
+  in three shaders; five bind groups for some materials; a NaN constant in an example. To
+  be filed upstream, with the human's go-ahead (`/upstream-report`).
+* Dawn is six releases behind (`/update-dawn`); action versions and Python 3.15
+  (`/refresh-infra`). See `python tools/maintenance_status.py`.
