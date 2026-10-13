@@ -311,6 +311,7 @@ typedef enum WGPUFeatureName {
     WGPUFeatureName_TextureComponentSwizzle = 0x00000016,
     WGPUFeatureName_SubgroupSizeControl = 0x00000017,
     WGPUFeatureName_TextureCompressionUnaligned = 0x00000018,
+    WGPUFeatureName_AtomicVec2uMinMax = 0x00000019,
     WGPUFeatureName_Unorm16TextureFormats = 0x0005000C,
     WGPUFeatureName_MultiDrawIndirect = 0x00050031,
     WGPUFeatureName_ChromiumExperimentalSubgroupMatrix = 0x00050034,

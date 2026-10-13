@@ -13,7 +13,7 @@ __all__ = ["dawn_version", "ffi", "is_emscripten", "lib"]
 
 # The Dawn release that the bindings are generated from and built against.
 # Keep in sync with DAWN_TAG in build_cffi.py.
-dawn_version = "v20260929.200159"
+dawn_version = "v20261009.190412"
 is_emscripten = sys.platform == "emscripten"
 
 if is_emscripten:

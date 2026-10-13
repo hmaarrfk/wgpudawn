@@ -366,6 +366,7 @@ enum_str2int = {
         "texture-component-swizzle": 22,
         "subgroup-size-control": 23,
         "texture-compression-unaligned": 24,
+        "atomic-vec2u-min-max": 25,
         "unorm16-texture-formats": 327692,
         "multi-draw-indirect": 327729,
         "chromium-experimental-subgroup-matrix": 327732,
