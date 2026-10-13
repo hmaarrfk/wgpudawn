@@ -24,21 +24,34 @@ The site is also rebuilt, with the pinned inputs, by every push to `main`.
 ## How it fits together
 
 * `website/build.py` assembles the site from a pygfx checkout and a directory
-  of wheels; `examples.json` lists the examples with what the pages need.
-  Examples that cannot run in any browser (Qt, PyTorch, ...) get a `skip`
-  reason from the `UNAVAILABLE` table (by imported module) or the
-  `SKIP_REASONS` table (by example) in `build.py`.
-* `website/notes.json`: for the examples that are run and fail, why, in
-  sentences that the gallery shows next to the example. You maintain it.
-* `website/runner.js` runs one example: loads Pyodide and packages, unpacks
-  the wheels, calls `wgpudawn.install_as_wgpu()`, runs the file as `__main__`.
-  Packages that an example imports are loaded up front (the tables in
-  `build.py`, `website/pyodide.json`) or on import (`LazyPackages`).
-* `website/check.mjs` runs every example in headless Chrome and writes
-  `results.json` and `shots/`. That is the only source of the gallery's
-  "works" claims and thumbnails. `website/expected.json` is the list of
-  examples known to work; CI fails when one of them does not.
-* `website/index.html`, `run.html`, `site.css`: the pages.
+  of wheels. It writes `examples.json` (the examples, with what the pages need
+  for each), one content-named `base.<hash>.zip` with everything that every
+  example needs (wgpudawn, pygfx, the pinned wheels from PyPI, the examples),
+  compiled to bytecode when `python3.14` is on the PATH, and per-example extras
+  (`wheels/`, `data/`, `imageio/`). Nothing is fetched from PyPI at run time:
+  every package is pinned in `website/pyodide.json` (`pypi_always`,
+  `pypi_by_import`, with their own requirements in `requires`) and downloaded
+  by the build with a checksum. Examples that cannot run in any browser (Qt,
+  PyTorch, ...) get a `skip` reason from `UNAVAILABLE` / `SKIP_REASONS` in
+  `build.py`; `website/notes.json` explains each known failure.
+* The site is one page (`index.html` + `app.js`; `run.html` is written by the
+  build as a copy, so that `run.html?ex=<category>/<name>` keeps working). It
+  keeps **one Python interpreter for the whole visit**: `runner.js` (browser
+  side) and `webhost.py` (Python side) run each example in a fresh `__main__`
+  on a fresh canvas and tear the previous one down. An example that fails
+  after another one ran is retried in a new interpreter before it is shown as
+  failed; examples that configure the GPU device get their own (`ISOLATE` in
+  `build.py`).
+* `website/check.mjs` runs every example in headless Chrome, **each in a fresh
+  page and interpreter**, and writes `results.json` and `shots/`. That is the
+  only source of the gallery's "works" claims and pictures.
+  `website/expected.json` is the list of examples known to work; CI fails when
+  one of them does not. `check.mjs --warm` walks through all examples in one
+  page, the way a visitor does: it must agree with the cold results (an
+  example must never work, or fail, because of what ran before it), and it
+  reports the time from click to first frame.
+* `website/diagnose.html`: a page that tests a browser step by step (WebGPU,
+  JSPI, Pyodide, wgpudawn), for bug reports. It does not use the site's code.
 * `upstream.json` `pygfx.commit`: the pinned pygfx, used for the website and
   for the CI job that runs pygfx's test suite on wgpudawn.
 
@@ -72,9 +85,14 @@ CHROME_FLAGS="--use-angle=vulkan --ignore-gpu-blocklist" \
   node website/check.mjs ../site --jobs 6 --expect website/expected.json
 ```
 
-(Without `CHROME_FLAGS` Chrome uses SwiftShader, as in CI: slower, and the
-truth for what CI will see. Run it that way too before pushing if anything
-looked marginal.) `--failed` re-runs only what failed; `--only <text>` one
+Then walk through them warm, on the GPU: `node website/check.mjs ../site --warm`
+(same `CHROME_FLAGS`). It must exit 0 and agree with the cold run.
+
+(`CHROME_FLAGS="--disable-gpu"` with `--keep-shots` is what CI sees: software
+WebGPU, where Chrome loses the device about a second after an example starts
+drawing and the canvas stays black. "ok" there means "started and reported no
+error until then"; the run on a GPU is the stronger statement. Run it that
+way too before pushing.) `--failed` re-runs only what failed; `--only <text>` one
 example. To watch one: `python -m http.server -d ../site 8765` and open
 `http://localhost:8765/run.html?ex=<category>/<name>`.
 
@@ -86,8 +104,10 @@ For each example that fails, find out why, in this order:
    a Pyodide build, a device): add the module to `UNAVAILABLE` in `build.py`
    with a short reason. It is then shown as such, not as broken.
 2. **The site does not provide something** (a package, a data file, a sample
-   image): fix `build.py` / `pyodide.json` / `runner.js`. Pure Python packages
-   go in `pypi_by_import`; pin versions of packages with compiled wheels.
+   image): fix `build.py` / `pyodide.json` / `runner.js`. A package from PyPI
+   goes in `pypi_by_import`, pinned, with its requirements in `requires`; a
+   module that an example imports indirectly in `IMPLIED_IMPORTS` in
+   `build.py`, so that it is loaded before the example runs.
 3. **wgpudawn is wrong**: reproduce it natively first, where validation errors
    are raised at the failing call (in the browser they arrive later and
    anonymous: "[Invalid RenderPipeline] is invalid due to a previous error"

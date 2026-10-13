@@ -105,6 +105,8 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
   border-bottom: 1px solid var(--line);
 }
 .home .bar { position: static; }
+/* One document, two views (app.js): the gallery and the viewer of one example */
+.home #view-run, .home #foot-run, .home #nav-run, .run #view-home, .run #foot-home, .run #nav-home { display: none; }
 .bar .wrap { display: flex; align-items: center; gap: 16px; height: 56px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.015em; white-space: nowrap; }
 .brand .mark { width: 22px; height: 22px; color: var(--accent); }
@@ -361,7 +363,12 @@ code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
   inset: 0 auto auto 0; transform-origin: 0 0;
   width: var(--canvas-w) !important; height: var(--canvas-h) !important;
 }
-.run .frame .poster { opacity: .28; filter: blur(14px) saturate(1.1); transform: scale(1.08); }
+/* The screenshot of the last check is what you see until the example draws.
+   A start that takes a while (.slow, set by app.js) dims it, under the progress. */
+.run .frame .poster { transition: opacity .3s ease, filter .3s ease, transform .3s ease; }
+.run .frame.slow .poster { opacity: .28; filter: blur(14px) saturate(1.1); transform: scale(1.08); }
+.run .frame.waiting canvas { opacity: 0; }
+.run .frame:not(.slow) .overlay { display: none; }
 .overlay {
   position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; justify-items: center; gap: 18px;
   padding: 24px; text-align: center; background: rgba(0, 0, 0, .35);

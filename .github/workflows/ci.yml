@@ -331,7 +331,9 @@ jobs:
         path: web-wheels
     - uses: actions/setup-python@v5
       with:
-        python-version: "3.13"
+        # The Python of Pyodide: the build compiles the packages to bytecode
+        # with it, which makes the site start faster
+        python-version: "3.14"
     - uses: actions/setup-node@v4
       with:
         node-version: "24"

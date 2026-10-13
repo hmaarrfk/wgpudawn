@@ -229,7 +229,8 @@ def check_pins():
                 out.append(f"npm {name} {spec} in {path} (latest {latest})")
     site = json.loads(read("website", "pyodide.json"))
     sh = read("website", "build_freetype.sh")
-    pypi = [s.split("==") for s in site["pypi_by_import"].values() if "==" in s]
+    pins = [*site.get("pypi_always", []), *site["pypi_by_import"].values()]
+    pypi = [s.split("==") for s in pins if "==" in s]
     pypi.append(["freetype-py", re.search(r"FREETYPE_PY_VERSION=(\S+)", sh).group(1)])
     for name, pinned in pypi:
         latest = get_json(f"https://pypi.org/pypi/{name}/json")["info"]["version"]

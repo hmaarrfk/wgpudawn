@@ -1,16 +1,55 @@
 {
   "version": "314.0.7",
   "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/",
+  "packages": [
+    "cffi",
+    "numpy",
+    "markupsafe",
+    "sniffio"
+  ],
   "pypi_always": [
-    "rendercanvas",
-    "pylinalg",
-    "hsluv",
-    "uharfbuzz"
+    "rendercanvas==2.7.2",
+    "pylinalg==0.6.8",
+    "hsluv==5.0.4",
+    "uharfbuzz==0.56.3",
+    "jinja2==3.1.6"
   ],
   "pypi_by_import": {
     "imgui_bundle": "imgui-bundle==1.92.900",
-    "trimesh": "trimesh",
-    "gltflib": "gltflib",
-    "observ": "observ"
-  }
+    "trimesh": "trimesh==5.1.1",
+    "gltflib": "gltflib==1.0.13",
+    "observ": "observ==1.0.1"
+  },
+  "requires": {
+    "imgui-bundle": [
+      "numpy"
+    ],
+    "trimesh": [
+      "numpy",
+      "pillow"
+    ],
+    "gltflib": [
+      "dataclasses-json==0.6.7",
+      "marshmallow==3.26.2",
+      "typing-inspect==0.9.0",
+      "mypy-extensions==1.1.0",
+      "packaging",
+      "typing-extensions"
+    ]
+  },
+  "not_on_import": [
+    "pillow_heif",
+    "xxhash",
+    "scipy",
+    "charset_normalizer",
+    "networkx",
+    "lxml",
+    "shapely",
+    "brotli",
+    "zstandard",
+    "click",
+    "pygments",
+    "rich",
+    "attr"
+  ]
 }
