@@ -1,0 +1,15 @@
+{
+  "wgpu-py": {
+    "repository": "https://github.com/pygfx/wgpu-py",
+    "version": "0.32.0",
+    "commit": "91d49ffdce645f15f8f2eb88294b9020181cb802"
+  },
+  "wgpu-py-dawn-pr": {
+    "url": "https://github.com/pygfx/wgpu-py/pull/840",
+    "commit": "4927018ebe1a3e7156536077977c3936bec70d5f"
+  },
+  "dawn": {
+    "repository": "https://github.com/google/dawn",
+    "tag": "v20260929.200159"
+  }
+}

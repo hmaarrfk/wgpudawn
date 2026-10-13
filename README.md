@@ -1,0 +1,124 @@
+# wgpudawn
+
+WebGPU for Python, on [Dawn](https://dawn.googlesource.com/dawn).
+
+`wgpudawn` is the API of [wgpu-py](https://github.com/pygfx/wgpu-py) with
+Dawn (Google's WebGPU implementation, the one in Chrome) as its backend,
+instead of wgpu-native.
+
+> **What this project is.** It only aims to provide a Dawn reference
+> implementation that follows the great architecture and design of wgpu-py,
+> from the [pygfx/wgpu-py](https://github.com/pygfx/wgpu-py) project. All
+> credit for the API, the design and most of the code goes to its authors.
+> This project is maintained by AI agents instead of humans: the code, the
+> ports of new wgpu-py releases and the releases themselves are made by an
+> agent (see [Versions and releases](#versions-and-releases)).
+
+It is a standalone package:
+
+* The wheels contain Dawn (statically linked); there is nothing else to install
+  apart from the GPU drivers of the system.
+* It is co-installable with wgpu-py: it only provides the `wgpudawn` module.
+* One wheel per platform works for all supported Python versions (abi3).
+
+```sh
+pip install wgpudawn
+```
+
+```py
+import wgpudawn as wgpu
+
+adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
+device = adapter.request_device_sync()
+print(adapter.summary)
+```
+
+The API is documented at https://wgpu-py.readthedocs.io; replace `wgpu` by
+`wgpudawn`. `wgpudawn.wgpu_py_version` is the version of wgpu-py that this
+version of wgpudawn mirrors.
+
+## Status
+
+Early. The wgpu-py tests that do not depend on wgpu-native specifics pass, and
+so does the unit test suite of [pygfx](https://github.com/pygfx/pygfx) (see
+below).
+
+Differences with wgpu-py:
+
+* Shaders are compiled by Tint, which follows the WGSL spec strictly; naga
+  (wgpu-native) accepts some shaders that Tint rejects.
+* No wgpu-native extras (`wgpu.backends.wgpu_native.extras`: GLSL shaders,
+  pipeline statistics queries, multi-draw-indirect-count, ...), and no
+  wgpu-native specific features and limits. Dawn has its own non-standard
+  features, e.g. `unorm16-texture-formats`.
+* Devices always have the `core-features-and-limits` feature.
+* The backends are Vulkan (Linux, Windows), Metal (macOS), and D3D12/D3D11
+  (Windows). There is no OpenGL backend.
+* Validation errors are raised at the call that causes them, and
+  `push_error_scope()` / `pop_error_scope_async()`, `get_compilation_info_async()`
+  and the device-lost promise are implemented.
+
+### Libraries that `import wgpu`
+
+Libraries such as pygfx and rendercanvas import `wgpu` by name, so they use
+wgpu-py, also when wgpudawn is installed. This repository has a small
+stand-in for wgpu-py in `tests/wgpu_shim` that makes `import wgpu` resolve to
+wgpudawn. It is used for testing only (CI runs the test suite of pygfx with
+it), and it is not part of the wgpudawn package.
+
+## Platforms
+
+Wheels are built for:
+
+| | x86-64 | arm64 |
+|---|---|---|
+| Linux (glibc >= 2.28) | yes | yes (includes Raspberry Pi 4/5 with a 64-bit OS) |
+| macOS (>= 11) | yes | yes |
+| Windows | yes | yes |
+
+In Pyodide, the same bindings run on the WebGPU of the browser (via Dawn's
+Emdawnwebgpu); CI builds and tests that wheel, but it is not published yet.
+
+## Building from source
+
+Dawn is not downloaded or built by `pip install`; build it first:
+
+```sh
+python tools/build_dawn.py --prefix /path/to/dawn    # needs git, cmake, ninja, a C++20 compiler
+DAWN_PREFIX=/path/to/dawn pip install -e ".[dev]"
+pip install ./tests/wgpu_shim                        # optional: for the tests that use rendercanvas
+pytest tests codegen
+```
+
+On Linux this needs the headers of X11, xcb and Wayland.
+`tools/build_dawn_manylinux.sh` does the same in the manylinux image that the
+wheels are built in. `DAWN_PREFIX` can also point to an extracted release
+archive of Dawn (of the release in `build_cffi.py`), or to a prefix with a
+shared `libwebgpu_dawn`.
+
+How it works:
+
+* `wgpudawn/_lib` is a cffi (API mode) extension. Its cdef
+  (`webgpu_cdef.h`) is generated from Dawn's `webgpu.h` by `tools/gen_cdef.py`.
+* `wgpudawn/backends/dawn` implements the API with it. It started as wgpu-py's
+  wgpu-native backend.
+* `codegen/` is wgpu-py's code generator: it writes the enums, flags and
+  structs from `webgpu.idl`, and checks the backend against the IDL and
+  against Dawn's header. Run `python codegen` after changing either.
+
+## Versions and releases
+
+The version comes from the git tag (there is no version number in the source).
+Pushing a tag such as `0.32.0` builds and tests the wheels, and publishes them
+to PyPI. `upstream.json` records the versions of wgpu-py and Dawn that the
+current code corresponds to.
+
+To update to a new version of wgpu-py or Dawn, see
+`.claude/skills/sync-upstream/SKILL.md`. With Claude Code:
+`claude "/sync-upstream"`.
+
+## License
+
+BSD 2-clause, see `LICENSE`. wgpudawn is derived from wgpu-py (Copyright
+2019-2023 Almar Klein, Korijn van Golen). The wheels include Dawn and the
+libraries that it is built with; see `LICENSES/`.

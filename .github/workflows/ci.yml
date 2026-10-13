@@ -1,0 +1,317 @@
+name: CI
+
+# Lints, builds the sdist and one (abi3) wheel per platform with Dawn linked
+# in, tests the wheels (also by running the test suite of pygfx on top of
+# wgpudawn), and publishes to PyPI when a version tag is pushed.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "[0-9]*"
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+permissions:
+  contents: read
+
+env:
+  PYODIDE_VERSION: "314.0.7"
+  PYODIDE_BUILD_VERSION: "0.39.1"
+  PYGFX_REF: main
+
+jobs:
+
+  lint:
+    name: Lint and codegen
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - run: pip install ruff pytest cffi numpy
+    - run: ruff check --output-format=github .
+    - run: ruff format --check .
+    - name: Test codegen (the generated code is up to date)
+      run: pytest -v codegen
+
+  sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # the version comes from git tags
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - run: pip install build
+    - run: python -m build --sdist
+    - run: ls -l dist && tar -tzf dist/*.tar.gz
+    - uses: actions/upload-artifact@v4
+      with:
+        name: dist-sdist
+        path: dist/*.tar.gz
+
+  wheels:
+    name: Wheel ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64, os: ubuntu-24.04 }
+          - { name: linux-aarch64, os: ubuntu-24.04-arm }
+          - { name: macos-arm64, os: macos-14 }
+          - { name: macos-x86_64, os: macos-15-intel }
+          - { name: windows-amd64, os: windows-2022, msvc_arch: x64 }
+          - { name: windows-arm64, os: windows-11-arm, msvc_arch: arm64 }
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # the version comes from git tags
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Locate Dawn
+      id: dawn
+      shell: bash
+      run: |
+        tag=$(python -c "import re; print(re.search(r'^DAWN_TAG = \"(.+?)\"', open('build_cffi.py').read(), re.M).group(1))")
+        prefix=$(python -c "import os; print(os.path.join(os.environ['RUNNER_TEMP'], 'dawn').replace(os.sep, '/'))")
+        echo "tag=$tag" >> $GITHUB_OUTPUT
+        echo "prefix=$prefix" >> $GITHUB_OUTPUT
+        echo "DAWN_PREFIX=$prefix" >> $GITHUB_ENV
+    - name: Restore Dawn from cache
+      id: dawn-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.dawn.outputs.prefix }}
+        key: dawn-${{ steps.dawn.outputs.tag }}-${{ matrix.name }}-${{ hashFiles('tools/build_dawn.py', 'tools/build_dawn_manylinux.sh') }}
+    - name: Build Dawn (Linux, in the manylinux image)
+      if: steps.dawn-cache.outputs.cache-hit != 'true' && runner.os == 'Linux'
+      run: tools/build_dawn_manylinux.sh "$DAWN_PREFIX"
+    - name: Set up MSVC
+      if: runner.os == 'Windows'
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: ${{ matrix.msvc_arch }}
+    - name: Build Dawn (macOS, Windows)
+      if: steps.dawn-cache.outputs.cache-hit != 'true' && runner.os != 'Linux'
+      shell: bash
+      run: |
+        pip install cmake ninja
+        # A short work dir: Dawn's tree is deep, and Windows paths are limited
+        python tools/build_dawn.py --prefix "$DAWN_PREFIX" --work-dir "$RUNNER_TEMP/db"
+    - name: Save Dawn to cache
+      if: steps.dawn-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.dawn.outputs.prefix }}
+        key: ${{ steps.dawn-cache.outputs.cache-primary-key }}
+    - name: Build wheel
+      uses: pypa/cibuildwheel@v3.2.1
+      env:
+        # On Linux the build runs in a container, with the host mounted at /host
+        CIBW_ENVIRONMENT_LINUX: DAWN_PREFIX=/host${{ steps.dawn.outputs.prefix }}
+    - run: ls -l wheelhouse
+      shell: bash
+    - uses: actions/upload-artifact@v4
+      with:
+        name: dist-wheel-${{ matrix.name }}
+        path: wheelhouse/*.whl
+
+  test:
+    name: Test ${{ matrix.name }} py${{ matrix.python }}
+    needs: wheels
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64, os: ubuntu-24.04, python: "3.11" }
+          - { name: linux-x86_64, os: ubuntu-24.04, python: "3.12" }
+          - { name: linux-x86_64, os: ubuntu-24.04, python: "3.13" }
+          - { name: linux-x86_64, os: ubuntu-24.04, python: "3.14" }
+          - { name: linux-aarch64, os: ubuntu-24.04-arm, python: "3.11" }
+          - { name: linux-aarch64, os: ubuntu-24.04-arm, python: "3.14" }
+          - { name: macos-arm64, os: macos-14, python: "3.11" }
+          - { name: macos-arm64, os: macos-15, python: "3.14" }
+          - { name: macos-x86_64, os: macos-15-intel, python: "3.13" }
+          - { name: windows-amd64, os: windows-2022, python: "3.11" }
+          - { name: windows-amd64, os: windows-2025, python: "3.14" }
+          - { name: windows-arm64, os: windows-11-arm, python: "3.13" }
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: dist-wheel-${{ matrix.name }}
+        path: dist
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+    - name: Install lavapipe (software Vulkan)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update -y -qq
+        sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+    - name: Install the wheel, the test-only wgpu shim, and test dependencies
+      run: |
+        # Test the wheel, not the source tree (which has no compiled extension)
+        rm -rf wgpudawn
+        pip install dist/*.whl
+        pip install ./tests/wgpu_shim
+        pip install numpy pytest psutil imageio anyio trio rendercanvas
+    - name: Show adapters
+      run: |
+        python -c "import wgpudawn; print(wgpudawn.__version__); print(wgpudawn.diagnostics.dawn_info.get_dict()); [print(a.summary) for a in wgpudawn.gpu.enumerate_adapters_sync()]"
+    - name: Run tests
+      run: pytest -v -rs tests
+
+  pygfx:
+    name: pygfx test suite on wgpudawn
+    needs: wheels
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+      with:
+        repository: pygfx/pygfx
+        ref: ${{ env.PYGFX_REF }}
+        path: pygfx-src
+    - uses: actions/download-artifact@v4
+      with:
+        name: dist-wheel-linux-x86_64
+        path: dist
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - name: Install llvmpipe and lavapipe for offscreen canvas
+      run: |
+        sudo apt-get update -y -qq
+        sudo apt-get install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers libvulkan1
+    - name: Install wgpudawn, the wgpu shim (instead of wgpu-py), and pygfx
+      run: |
+        pip install dist/*.whl
+        # Not shipped; takes the place of wgpu-py so that `import wgpu` is wgpudawn
+        pip install ./tests/wgpu_shim
+        pip install "./pygfx-src[tests]"
+        pip list
+    - name: Check that pygfx runs on wgpudawn
+      run: |
+        cd pygfx-src
+        python - <<'PY'
+        import wgpu, wgpudawn, pygfx
+        from importlib.metadata import files
+        assert wgpu.GPUDevice is wgpudawn.GPUDevice
+        assert not any("wgpu_native" in str(f) for f in files("wgpu")), "wgpu-py is installed"
+        device = pygfx.renderers.wgpu.get_shared().device
+        assert type(device).__module__.startswith("wgpudawn.backends.dawn"), type(device)
+        print("pygfx", pygfx.__version__, "on", device.adapter.summary)
+        PY
+    - name: Unit tests of pygfx
+      run: |
+        cd pygfx-src
+        pytest -v tests
+
+  pyodide:
+    name: Pyodide (Emdawnwebgpu) in Node
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PYODIDE_XBUILDENV_PATH: /home/runner/xbuildenv
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.14"
+    - name: Install pyodide-build
+      run: pip install pyodide-build==${PYODIDE_BUILD_VERSION}
+    - name: Install Pyodide cross-build environment and Emscripten
+      run: |
+        pyodide xbuildenv install ${PYODIDE_VERSION}
+        pyodide xbuildenv install-emscripten
+    - name: Build wgpudawn for Pyodide
+      run: |
+        source ${PYODIDE_XBUILDENV_PATH}/${PYODIDE_VERSION}/emsdk/emsdk_env.sh
+        emcc --version | head -1
+        pyodide build --exports pyinit -o dist
+        ls -l dist
+    - uses: actions/upload-artifact@v4
+      with:
+        name: pyodide-wheel
+        path: dist/*.whl
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "26"
+    - name: Install lavapipe
+      run: |
+        sudo apt-get update -y -qq
+        sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+    - name: Install npm packages
+      run: cd tests/pyodide && npm install --no-audit --no-fund
+    - name: Run scripts
+      run: |
+        WHEELS=$(ls $PWD/dist/*.whl | tr '\n' ',')
+        cd tests/pyodide
+        node run_node.mjs $WHEELS compute_async.py
+        node run_node.mjs $WHEELS compute_sync.py
+        node run_node.mjs $WHEELS triangle.py
+    - name: Run tests
+      run: |
+        WHEELS=$(ls $PWD/dist/*.whl | tr '\n' ',')
+        cd tests/pyodide
+        node run_node.mjs $WHEELS --pytest ../../tests \
+          tests/test_util_compute.py tests/test_util_core.py tests/test_not_finite.py \
+          tests/test_wgpu_compute_tex.py tests/test_wgpu_render.py \
+          tests/test_wgpu_render_tex.py tests/test_wgpu_texture.py -k "not spirv"
+
+  publish:
+    name: Publish to PyPI
+    if: github.ref_type == 'tag'
+    needs: [lint, sdist, wheels, test, pygfx]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/wgpudawn/
+    permissions:
+      id-token: write  # trusted publishing: no token needed
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: dist-*
+        path: dist
+        merge-multiple: true
+    - name: Check that the version is the tag
+      run: |
+        ls -l dist
+        for f in dist/*; do
+          case "$(basename $f)" in
+            wgpudawn-${GITHUB_REF_NAME}-*|wgpudawn-${GITHUB_REF_NAME}.tar.gz) ;;
+            *) echo "::error::$f is not version ${GITHUB_REF_NAME}"; exit 1 ;;
+          esac
+        done
+    - uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        print-hash: true

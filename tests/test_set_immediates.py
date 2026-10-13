@@ -1,0 +1,198 @@
+import numpy as np
+import pytest
+
+import wgpudawn as wgpu
+from testutils import can_use_wgpu_lib, run_tests
+from wgpudawn import TextureFormat
+
+if not can_use_wgpu_lib:
+    pytest.skip("Skipping tests that need the wgpu lib", allow_module_level=True)
+
+# The shader below (from wgpu-py) puts arrays in the <immediate> address space.
+# The WGSL spec does not allow that, and Tint rejects it (naga accepts it).
+pytest.skip(
+    "Test shader uses arrays in the immediate address space",
+    allow_module_level=True,
+)
+
+
+"""
+This code is an amazingly slow way of adding together two 10-element arrays of 32-bit
+integers defined by immediates and store them into an output buffer.
+
+The first number of the addition is purposely pulled using the vertex stage, and the
+second number from the fragment stage, so that we can ensure that we are correctly
+using immediates across stages.
+
+The source code assumes the topology is POINT-LIST, so that each call to vertexMain
+corresponds with one call to fragmentMain.
+"""
+COUNT = 10
+
+SHADER_SOURCE = (
+    f"""
+    const COUNT = {COUNT}u;
+"""
+    """
+    // Put the results here
+    @group(0) @binding(0) var<storage, read_write> data: array<u32, COUNT>;
+
+    struct Immediates {
+        values1: array<u32, COUNT>, // immediates for VERTEX
+        values2: array<u32, COUNT>, // immediates for FRAGMENT
+    }
+    var<immediate> immediates: Immediates;
+
+    struct VertexOutput {
+        @location(0) @interpolate(flat) index: u32,
+        @location(1) @interpolate(flat) value: u32,
+        @builtin(position) position: vec4f,
+    }
+
+    @vertex
+    fn vertexMain(
+        @builtin(vertex_index) index: u32,
+    ) -> VertexOutput {
+        return VertexOutput(index, immediates.values1[index], vec4f(0, 0, 0, 1));
+    }
+
+    @fragment
+    fn fragmentMain(@location(0) @interpolate(flat) index: u32,
+                    @location(1) @interpolate(flat) value: u32
+    ) -> @location(0) vec4f {
+        data[index] = value + immediates.values2[index];
+        return vec4f();
+    }
+"""
+)
+
+BIND_GROUP_ENTRIES = [
+    {"binding": 0, "visibility": "FRAGMENT", "buffer": {"type": "storage"}},
+]
+
+
+def setup_pipeline():
+    adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
+    # In Dawn, immediates are a WGSL language feature (immediate_address_space)
+    # rather than a device feature.
+    device = adapter.request_device_sync()
+    output_texture = device.create_texture(
+        # Actual size is immaterial.  Could just be 1x1
+        size=[128, 128],
+        format=TextureFormat.rgba8unorm,
+        usage="RENDER_ATTACHMENT|COPY_SRC",
+    )
+    shader = device.create_shader_module(code=SHADER_SOURCE)
+    bind_group_layout = device.create_bind_group_layout(entries=BIND_GROUP_ENTRIES)
+    render_pipeline_layout = device.create_pipeline_layout(
+        bind_group_layouts=[bind_group_layout],
+        immediate_size=COUNT * 4 * 2,
+    )
+    pipeline = device.create_render_pipeline(
+        layout=render_pipeline_layout,
+        vertex={
+            "module": shader,
+            "entry_point": "vertexMain",
+        },
+        fragment={
+            "module": shader,
+            "entry_point": "fragmentMain",
+            "targets": [{"format": output_texture.format}],
+        },
+        primitive={
+            "topology": "point-list",
+        },
+    )
+    render_pass_descriptor = {
+        "color_attachments": [
+            {
+                "clear_value": (0, 0, 0, 0),  # only first value matters
+                "load_op": "clear",
+                "store_op": "store",
+                "view": output_texture.create_view(),
+            }
+        ],
+    }
+
+    return device, pipeline, render_pass_descriptor
+
+
+def test_normal_immediates():
+    device, pipeline, render_pass_descriptor = setup_pipeline()
+    vertex_call_buffer = device.create_buffer(size=COUNT * 4, usage="STORAGE|COPY_SRC")
+    bind_group = device.create_bind_group(
+        layout=pipeline.get_bind_group_layout(0),
+        entries=[
+            {"binding": 0, "resource": {"buffer": vertex_call_buffer}},
+        ],
+    )
+
+    encoder = device.create_command_encoder()
+    this_pass = encoder.begin_render_pass(**render_pass_descriptor)
+    this_pass.set_pipeline(pipeline)
+    this_pass.set_bind_group(0, bind_group)
+
+    buffer = np.random.randint(0, 1_000_000, size=(2 * COUNT), dtype=np.uint32)
+    this_pass.set_immediates(0, buffer, 0, COUNT * 4)
+    this_pass.set_immediates(COUNT * 4, buffer, COUNT * 4, COUNT * 4)
+    this_pass.draw(COUNT)
+    this_pass.end()
+    device.queue.submit([encoder.finish()])
+    info_view = device.queue.read_buffer(vertex_call_buffer)
+    result = np.frombuffer(info_view, dtype=np.uint32)
+    expected_result = buffer[0:COUNT] + buffer[COUNT:]
+    assert all(result == expected_result)
+
+
+def test_render_bundle_immediates():
+    device, pipeline, render_pass_descriptor = setup_pipeline()
+    vertex_call_buffer = device.create_buffer(size=COUNT * 4, usage="STORAGE|COPY_SRC")
+    bind_group = device.create_bind_group(
+        layout=pipeline.get_bind_group_layout(0),
+        entries=[
+            {"binding": 0, "resource": {"buffer": vertex_call_buffer}},
+        ],
+    )
+    bundle_encoder = device.create_render_bundle_encoder(
+        color_formats=[TextureFormat.rgba8unorm],
+    )
+    bundle_encoder.set_pipeline(pipeline)
+    bundle_encoder.set_bind_group(0, bind_group)
+    buffer = np.random.randint(0, 1_000_000, size=(2 * COUNT), dtype=np.uint32)
+    bundle_encoder.set_immediates(0, buffer, 0, COUNT * 4)
+    bundle_encoder.set_immediates(COUNT * 4, buffer, COUNT * 4, COUNT * 4)
+    bundle_encoder.draw(COUNT)
+    render_bundle = bundle_encoder.finish()
+
+    # a different encoder to execute the bundle
+    encoder = device.create_command_encoder()
+    this_pass = encoder.begin_render_pass(**render_pass_descriptor)
+    this_pass.execute_bundles([render_bundle])
+    this_pass.end()
+    device.queue.submit([encoder.finish()])
+
+    info_view = device.queue.read_buffer(vertex_call_buffer)
+    result = np.frombuffer(info_view, dtype=np.uint32)
+    expected_result = buffer[0:COUNT] + buffer[COUNT:]
+    assert all(result == expected_result)
+
+
+def test_bad_set_immediates():
+    device, _pipeline, render_pass_descriptor = setup_pipeline()
+    encoder = device.create_command_encoder()
+    this_pass = encoder.begin_render_pass(**render_pass_descriptor)
+
+    def zeros(n):
+        return np.zeros(n, dtype=np.uint32)
+
+    with pytest.raises(ValueError):
+        # Buffer is too short
+        this_pass.set_immediates(0, zeros(COUNT - 1), 0, COUNT * 4)
+
+    with pytest.raises(ValueError):
+        # Buffer is too short
+        this_pass.set_immediates(0, zeros(COUNT + 1), 8, COUNT * 4)
+
+
+if __name__ == "__main__":
+    run_tests(globals())

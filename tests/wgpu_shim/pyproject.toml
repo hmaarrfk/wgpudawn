@@ -1,0 +1,18 @@
+# Test-only stand-in for wgpu-py that redirects `import wgpu` to wgpudawn.
+# Never published. Its version is the wgpu-py version that wgpudawn mirrors
+# (see upstream.json), so that it satisfies e.g. pygfx's requirement on wgpu.
+
+[project]
+name = "wgpu"
+version = "0.32.0"
+description = "Test-only shim: makes `import wgpu` resolve to wgpudawn"
+requires-python = ">= 3.11"
+dependencies = ["wgpudawn"]
+classifiers = ["Private :: Do Not Upload"]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["wgpu"]

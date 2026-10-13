@@ -1,0 +1,108 @@
+# ===== Project info
+
+[project]
+dynamic = ["version"]
+name = "wgpudawn"
+description = "WebGPU for Python, on Dawn. A standalone build of the wgpu-py API with a Dawn backend."
+readme = "README.md"
+license = "BSD-2-Clause"
+license-files = ["LICENSE", "LICENSES/*"]
+authors = [
+    { name = "Mark Harfouche" },
+    { name = "Almar Klein" },
+    { name = "Korijn van Golen" },
+]
+keywords = ["webgpu", "wgpu", "dawn", "vulkan", "metal", "DX12"]
+requires-python = ">= 3.11"
+dependencies = [
+    "cffi>=1.17",
+    "rubicon-objc>=0.4.1; sys_platform == 'darwin'",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics",
+]
+
+[project.optional-dependencies]
+# For users
+imgui = ["imgui-bundle>=1.92.0, <2"]
+# For devs / ci
+codegen = ["pytest", "numpy", "ruff"]
+lint = ["ruff", "pre-commit"]
+tests = [
+    "numpy",
+    "pytest",
+    "psutil",
+    "imageio",
+    "anyio",
+    "trio",
+    "rendercanvas>=2.4.0",
+]
+examples = ["pypng", "rendercanvas", "glfw", "imgui_bundle"]
+dev = ["wgpudawn[codegen,lint,tests,examples]"]
+
+[project.entry-points."pyinstaller40"]
+hook-dirs = "wgpudawn.__pyinstaller:get_hook_dirs"
+tests = "wgpudawn.__pyinstaller:get_test_dirs"
+
+[project.urls]
+Homepage = "https://github.com/hmaarrfk/wgpudawn"
+Repository = "https://github.com/hmaarrfk/wgpudawn"
+
+# ===== Building
+#
+# setuptools, because the package has a compiled (cffi) extension. The version
+# comes from git tags (miniver, see wgpudawn/_version.py and setup.py).
+
+[build-system]
+requires = ["setuptools>=77", "cffi>=1.17"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["wgpudawn", "wgpudawn.*"]
+
+[tool.setuptools.package-data]
+"wgpudawn._lib" = ["*.h", "*.js"]
+"wgpudawn.resources" = ["*.idl", "*.md"]
+
+# The extension uses the limited API, so one (abi3) wheel per platform is
+# enough. Dawn is built beforehand (tools/build_dawn.py) and found via
+# DAWN_PREFIX; see .github/workflows/ci.yml.
+[tool.cibuildwheel]
+build = "cp311-*"
+skip = "*-musllinux_*"
+archs = ["native"]
+build-verbosity = 1
+test-command = 'python -c "import wgpudawn.backends.dawn as d; print(d.__version__)"'
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+# ===== Tooling
+
+[tool.ruff]
+line-length = 88
+extend-exclude = ["wgpudawn/_version.py", "wgpudawn/_static_version.py"]
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "N", "B", "RUF"]
+ignore = [
+    "E501",   # Line too long
+    "E731",   # Do not assign a `lambda` expression, use a `def`
+    "B007",   # Loop control variable `x` not used within loop body
+    "RUF012", # Mutable class attributes should be annotated with `typing.ClassVar`
+]
+
+[tool.coverage.report]
+exclude_also = [
+    # Have to re-enable the standard pragma, plus a less-ugly flavor
+    "pragma: no cover",
+    "no-cover",
+    "raise NotImplementedError",
+]

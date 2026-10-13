@@ -1,0 +1,11 @@
+include LICENSE
+include README.md
+include build_cffi.py
+include wgpudawn/_version.py
+include wgpudawn/_static_version.py
+recursive-include LICENSES *
+recursive-include wgpudawn/_lib *.h *.cpp
+recursive-include tools *.py
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+exclude wgpudawn/_lib/emdawn_glue.js
