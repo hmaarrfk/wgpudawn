@@ -7,7 +7,7 @@ argument-hint: "[run id or URL, default: the last run on main] [diagnose]"
 # CI doctor
 
 Everything this project claims is checked by one workflow, `CI`
-(`.github/workflows/ci.yml`): lint and codegen, the sdist, six wheels with Dawn
+(`.github/workflows/wheels.yml`): lint and codegen, the sdist, six wheels with Dawn
 linked in, the tests of each wheel, the test suite of pygfx on wgpudawn, the
 Pyodide wheel, the website (every pygfx example in headless Chrome), the
 deployment of the website (pushes to `main`) and the publication to PyPI
@@ -148,7 +148,7 @@ Rules:
 * Never get to green by skipping a test, removing a platform, removing an
   entry of `website/expected.json`, or adding `continue-on-error`. If a check
   is wrong, fix the check and say why in the commit.
-* A fix in `.github/workflows/ci.yml` is still a fix of the cause: do not
+* A fix in `.github/workflows/wheels.yml` is still a fix of the cause: do not
   restructure the workflow while you are there.
 * The same wheel is tested on several Pythons and images; a failure on one
   entry of the matrix only is information about that image, not noise.

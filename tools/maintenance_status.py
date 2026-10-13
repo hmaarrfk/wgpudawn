@@ -154,11 +154,11 @@ def check_pygfx():
 
 def check_pyodide():
     site = json.loads(read("website", "pyodide.json"))
-    ci = read(".github", "workflows", "ci.yml")
+    ci = read(".github", "workflows", "wheels.yml")
     places = {
         "website/pyodide.json version": site["version"],
         "website/pyodide.json url": re.search(r"/v([\d.]+)/", site["url"]).group(1),
-        "ci.yml PYODIDE_VERSION": re.search(r'PYODIDE_VERSION: "(.+?)"', ci).group(1),
+        "wheels.yml PYODIDE_VERSION": re.search(r'PYODIDE_VERSION: "(.+?)"', ci).group(1),
         "tests/pyodide/package.json": json.loads(
             read("tests", "pyodide", "package.json")
         )["dependencies"]["pyodide"],
@@ -176,7 +176,7 @@ def check_pyodide():
 
 
 def check_actions():
-    ci = read(".github", "workflows", "ci.yml")
+    ci = read(".github", "workflows", "wheels.yml")
     uses = sorted(set(re.findall(r"uses: ([\w.-]+/[\w.-]+)[\w./-]*@(\S+)", ci)))
     old = []
     for repo in sorted({r for r, _ in uses}):
@@ -193,7 +193,7 @@ def check_actions():
 
 
 def check_python():
-    ci = read(".github", "workflows", "ci.yml")
+    ci = read(".github", "workflows", "wheels.yml")
     tested = sorted({vtuple(v) for v in re.findall(r'python: "(3\.\d+)"', ci)})
     url = "https://raw.githubusercontent.com/actions/python-versions/main/versions-manifest.json"
     stable = max(vtuple(v["version"])[:2] for v in get_json(url) if v["stable"])
@@ -205,7 +205,7 @@ def check_python():
 
 
 def check_runners():
-    ci = read(".github", "workflows", "ci.yml")
+    ci = read(".github", "workflows", "wheels.yml")
     labels = sorted(
         set(
             re.findall(r"\bos: ([\w.-]+)", ci)

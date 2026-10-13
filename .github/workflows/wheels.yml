@@ -1,3 +1,6 @@
+# The name of this file is part of the identity that PyPI trusts for uploads
+# (trusted publishing: hmaarrfk/wgpudawn, wheels.yml). Renaming it breaks
+# releases until the publisher on PyPI is changed too.
 name: CI
 
 # Lints, builds the sdist and one (abi3) wheel per platform with Dawn linked

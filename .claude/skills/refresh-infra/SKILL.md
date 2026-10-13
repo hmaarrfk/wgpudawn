@@ -32,7 +32,7 @@ infrastructure change on top of a red build cannot be verified.
 
 ## 2. How to change each thing
 
-**Actions** (`uses:` in `.github/workflows/ci.yml`). For each one that is
+**Actions** (`uses:` in `.github/workflows/wheels.yml`). For each one that is
 behind, read what the new majors break before changing the number:
 `gh release view <tag> -R <owner>/<action> --json body --jq .body` for each
 major in between. What matters here:
@@ -72,7 +72,7 @@ major in between. What matters here:
   change of image, compare the wheel file names with step 3 of the `release`
   skill.
 
-**cibuildwheel and manylinux** (`pypa/cibuildwheel@...` in `ci.yml`,
+**cibuildwheel and manylinux** (`pypa/cibuildwheel@...` in `wheels.yml`,
 `[tool.cibuildwheel]` in `pyproject.toml`, the image in
 `tools/build_dawn_manylinux.sh`). Dawn is built in the manylinux image by our
 script, and the wheel is built and repaired by cibuildwheel in its default
@@ -88,7 +88,7 @@ intended, and listed in `LICENSES/README.md`.)
 
 **Python versions.** The wheels are abi3 (`cp311-abi3`: `build = "cp311-*"`
 in `pyproject.toml`, `py_limited_api` in `setup.py`), so a new Python needs
-no new wheel, only a test: add it to the `test` matrix of `ci.yml` as soon as
+no new wheel, only a test: add it to the `test` matrix of `wheels.yml` as soon as
 `setup-python` has a stable build (the `python` line of the status tool), on
 `linux-x86_64` and as the Python of the "newest image" entry of each other
 platform. If a test dependency has no wheel for it yet, say so and try again
@@ -132,7 +132,7 @@ change, the examples that use it must still work (`update-website`, step 2;
 owner's commits are formatted with; CI installs the newest ruff. Keep the
 `rev` at the current ruff, and when a new ruff reformats or flags existing
 code, fix the code in the same commit. `PYODIDE_BUILD_VERSION` goes with
-Pyodide (`update-website`). `node-version` of `setup-node` in `ci.yml`: an
+Pyodide (`update-website`). `node-version` of `setup-node` in `wheels.yml`: an
 active LTS or current release. The minimum versions in `[build-system]` and
 `dependencies` of `pyproject.toml` only go up when something needs it.
 

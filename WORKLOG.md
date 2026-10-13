@@ -132,6 +132,20 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-13 - Python starts with the gallery; the first release
+
+Same session, continued.
+
+* The gallery starts the interpreter by itself after it has loaded, so that
+  the first example opens as the later ones do (0.1 s instead of 1.1 s
+  locally).
+* PyPI refused both release candidates: the publisher registered there named
+  the workflow `wheels.yml`, the repository had `ci.yml`. The error message
+  of PyPI lists what the run claimed, not what PyPI expects, so only the
+  human could see the difference. The workflow file is renamed.
+* A report from Safari on a Mac (most spheres of pbr2 missing) could not be
+  reproduced: the WebKit of Playwright on Linux has no WebGPU. Open.
+
 ## 2026-10-13 - The website on a branch of pygfx with the fixes it needs
 
 Same session, continued (15.4 h wall clock, 48 human prompts by now). The

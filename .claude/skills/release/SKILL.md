@@ -9,7 +9,7 @@ argument-hint: "[X.Y.Z.N | rc | check] (default: the next X.Y.Z.N; 'check' never
 The version of wgpudawn is the git tag: there is no version number in the
 source (miniver, `wgpudawn/_version.py`). Pushing a tag that starts with a
 digit runs the `CI` workflow on it, and its last job, `Publish to PyPI`
-(`.github/workflows/ci.yml`, environment `pypi`, trusted publishing: no token),
+(`.github/workflows/wheels.yml`, environment `pypi`, trusted publishing: no token),
 uploads the sdist and the seven wheels. That upload cannot be undone and a
 version can never be uploaded twice. Everything before the tag is cheap to
 redo; the tag is not. Your job is to make sure that the tag is pushed only on
@@ -143,7 +143,7 @@ gh run view $run --json jobs --jq '.jobs[] | select(.name == "Publish to PyPI") 
   never saw the version; check with the `curl` of step 2.
 * The publish job itself fails. `invalid-publisher` or a 403: PyPI does not
   trust this workflow (the trusted publisher of the project `wgpudawn` must be
-  owner `hmaarrfk`, repository `wgpudawn`, workflow `ci.yml`, environment
+  owner `hmaarrfk`, repository `wgpudawn`, workflow `wheels.yml`, environment
   `pypi`); only the owner can set that on pypi.org; nothing was uploaded, and
   the job can be re-run afterwards. `<file> is not version <tag>`: the tag
   spelling, see step 1; delete the tag and use the right one. `File already

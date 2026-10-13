@@ -72,7 +72,7 @@ include = ["wgpudawn", "wgpudawn.*"]
 
 # The extension uses the limited API, so one (abi3) wheel per platform is
 # enough. Dawn is built beforehand (tools/build_dawn.py) and found via
-# DAWN_PREFIX; see .github/workflows/ci.yml.
+# DAWN_PREFIX; see .github/workflows/wheels.yml.
 [tool.cibuildwheel]
 build = "cp311-*"
 skip = "*-musllinux_*"

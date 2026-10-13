@@ -136,7 +136,7 @@ Fix what fails and push again (the `ci-doctor` skill has the failure classes
 that this project has seen). A push to `main` cancels the run of the previous
 push, and with it an hour of Dawn builds: do not push anything else meanwhile.
 Compilers on the CI runners are older than a local one: a Dawn that needs a
-newer compiler means changing the runner image in `.github/workflows/ci.yml`,
+newer compiler means changing the runner image in `.github/workflows/wheels.yml`,
 not dropping the platform.
 
 ## 6. Release

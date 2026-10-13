@@ -74,7 +74,7 @@ whose `Pyodide` job succeeded, `gh run list --branch main --workflow CI`.)
 
 Use the wgpudawn wheel of the commit you are on: if you changed `wgpudawn/` or
 the bindings, build it instead (`pyodide build --exports pyinit`, see the
-`pyodide` job in `.github/workflows/ci.yml` for the environment; the same job
+`pyodide` job in `.github/workflows/wheels.yml` for the environment; the same job
 shows how `website/build_freetype.sh` is run).
 
 ## 2. Check every example
@@ -172,11 +172,11 @@ drawing: treat it as a failure (and consider making `check.mjs` detect it).
 ## 5. Pyodide update (only when asked or needed)
 
 The Pyodide version is in four places that must agree: `website/pyodide.json`
-(`version`, and inside `url`), `PYODIDE_VERSION` in `.github/workflows/ci.yml`,
+(`version`, and inside `url`), `PYODIDE_VERSION` in `.github/workflows/wheels.yml`,
 and `tests/pyodide/package.json`; `python tools/maintenance_status.py --only pyodide`
 checks that. With them go `PYODIDE_BUILD_VERSION` (the pyodide-build that
 supports that Pyodide) and the `python-version` of the `pyodide` job in
-`ci.yml` (the Python of that Pyodide), and the sentence about Pyodide in the
+`wheels.yml` (the Python of that Pyodide), and the sentence about Pyodide in the
 Platforms section of `README.md`.
 A new Pyodide can mean a new Emscripten and platform tag
 (`pyemscripten_<year>_<n>_wasm32`): then also `PLATFORM_TAG` in
