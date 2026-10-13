@@ -78,7 +78,10 @@ const manifest = await fetch('examples.json').then((r) => r.json()).catch(() => 
 // is served next to this page (?pyodide=pyodide/)
 const asked = new URLSearchParams(location.search).get('pyodide');
 const pyodideUrl = asked ? new URL(asked.replace(/\/?$/, '/'), location.href).href
-  : manifest ? manifest.pyodide.url : 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
+  : manifest ? new URL(manifest.pyodide.index || manifest.pyodide.url, location.href).href
+  : 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
+// The packages of the distribution, when the core is the site's own copy
+const packagesUrl = !asked && manifest && manifest.pyodide.index ? manifest.pyodide.url : undefined;
 const state = { py: null, dead: false };
 
 const python = (code) => state.py.runPythonAsync(code);
@@ -196,7 +199,7 @@ const TESTS = [
 
   ['Pyodide loads', pyodideUrl, async (note) => {
     const { loadPyodide } = await import(pyodideUrl + 'pyodide.mjs');
-    state.py = await loadPyodide({ indexURL: pyodideUrl, stdout: note, stderr: note });
+    state.py = await loadPyodide({ indexURL: pyodideUrl, ...(packagesUrl ? { packageBaseUrl: packagesUrl, stdLibURL: packagesUrl + 'python_stdlib.zip' } : {}), stdout: note, stderr: note });
     return `Pyodide ${state.py.version}; ` + await python('import sys; sys.version');
   }],
 

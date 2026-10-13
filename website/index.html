@@ -226,7 +226,7 @@ if (/[?&]ex=/.test(location.search) || /run\.html$/.test(location.pathname)) doc
     </div>
     <div>
       <h3>Your browser</h3>
-      <p id="browser">The examples need WebGPU. The blocking parts of the API (reading back from the GPU, picking) also need JSPI (WebAssembly stack switching) that Pyodide can use: recent versions of Chrome and Edge have both, Safari runs the examples that only draw.</p>
+      <p id="browser">The examples need WebGPU. The blocking parts of the API (reading back from the GPU, picking) also need JSPI (WebAssembly stack switching) that Pyodide can use: recent versions of Chrome, Edge and Safari have both.</p>
       <p><a class="link" href="diagnose.html">Test this browser</a>: a page that tries WebGPU, Pyodide and JSPI one by one and says where it stops.</p>
     </div>
     <p class="fine" id="fine">Python runs in Pyodide, in this page.</p>
@@ -239,7 +239,7 @@ if (/[?&]ex=/.test(location.search) || /run\.html$/.test(location.pathname)) doc
       An example of <a class="link" href="https://github.com/pygfx/pygfx" target="_blank" rel="noopener">pygfx</a>, unmodified, with credit to its authors.
       It runs in this page on Dawn's WebGPU through <a class="link" href="https://github.com/hmaarrfk/wgpudawn" target="_blank" rel="noopener">wgpudawn</a>,
       a Dawn reference implementation that follows the architecture and design of <a class="link" href="https://github.com/pygfx/wgpu-py" target="_blank" rel="noopener">wgpu-py</a>, maintained by AI agents.
-      Needs WebGPU: recent Chrome or Edge. Safari runs the examples that only draw.
+      Needs WebGPU: recent Chrome, Edge or Safari.
       Not working here? <a class="link" href="diagnose.html">Test this browser</a>.
     </p>
   </div>

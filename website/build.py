@@ -260,6 +260,55 @@ def normalize(name):
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
+# CPython calls C functions through a trampoline. Where it thinks it is on iOS
+# it uses one written in JavaScript (a workaround for a WebKit bug in iOS
+# 18.3.1), and WebAssembly cannot suspend through a JavaScript frame: in
+# Safari on an iPhone the first pyodide.ffi.run_sync was a fatal error
+# ("SuspendError: JavaScript frames found between WebAssembly.Suspending and
+# WebAssembly.promising"). A browser that has JSPI gets the WebAssembly
+# trampoline here. See https://github.com/hmaarrfk/wgpudawn/issues/1
+IOS_TRAMPOLINE = (
+    "if(isIOS){return 0}",
+    'if(isIOS&&typeof WebAssembly.Suspending!=="function"){return 0}',
+)
+
+
+def host_pyodide(out, pyodide, cache_dir):
+    """The core of Pyodide, served by the site, with ``IOS_TRAMPOLINE`` applied.
+
+    The packages of the distribution still come from where it is published.
+    Returns the directory, relative to the site.
+    """
+    files = {}
+    for name in (
+        "pyodide.mjs",
+        "pyodide.asm.mjs",
+        "pyodide.asm.wasm",
+        "pyodide-lock.json",
+    ):
+        path = download(
+            pyodide["url"] + name,
+            os.path.join(cache_dir, "pyodide", pyodide["version"], name),
+        )
+        with open(path, "rb") as f:
+            files[name] = f.read()
+    before, after = (text.encode() for text in IOS_TRAMPOLINE)
+    if files["pyodide.asm.mjs"].count(before) != 1:
+        raise SystemExit(
+            "pyodide.asm.mjs does not have the iOS trampoline check as expected: "
+            "see IOS_TRAMPOLINE in website/build.py (a newer Pyodide may not need it)"
+        )
+    files["pyodide.asm.mjs"] = files["pyodide.asm.mjs"].replace(before, after)
+    name = "pyodide-{}-{}".format(
+        pyodide["version"], digest(b"".join(files[k] for k in sorted(files)))
+    )
+    os.makedirs(os.path.join(out, name), exist_ok=True)
+    for filename, data in files.items():
+        with open(os.path.join(out, name, filename), "wb") as f:
+            f.write(data)
+    return name + "/"
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()[:12]
 
@@ -707,6 +756,8 @@ def main():
         "pyodide": {
             "version": pyodide["version"],
             "url": pyodide["url"],
+            # The core of Pyodide as the site serves it (see host_pyodide)
+            "index": host_pyodide(out, pyodide, args.cache),
             # Loaded for every example, and the files of the distribution
             # behind each package that the site uses (to fetch them early)
             "packages": pyodide["packages"],

@@ -472,7 +472,7 @@ function openExample(example, how) {
   (async () => {
     log(runner.describeBrowser(), 'out');
     if (!jspi) {
-      log('In this browser Python cannot wait for the browser in the middle of a call (that takes JSPI, and Pyodide crashes on it in Safari). Examples that only draw run; reading back from the GPU, such as picking, raises an error. Recent Chrome and Edge have no such limit.', 'out');
+      log('This browser has no JSPI (WebAssembly stack switching), so Python cannot wait for the browser in the middle of a call. Examples that only draw run; reading back from the GPU, such as picking, raises an error. Recent Chrome, Edge and Safari have it.', 'out');
     }
     try {
       const info = await runner.run(example, {
@@ -632,7 +632,7 @@ function buildGallery() {
   if (!webgpu) {
     $('browser').textContent = 'This browser does not have WebGPU, so the examples cannot run here: you are looking at screenshots. Recent versions of Chrome and Edge have it.';
   } else if (!jspi) {
-    $('browser').textContent = 'This browser has WebGPU, but Python cannot wait for the browser in the middle of a call here (that takes JSPI, and Pyodide crashes on it in Safari). Examples that only draw run; those that read back from the GPU, such as picking, do not. Recent versions of Chrome and Edge run them all.';
+    $('browser').textContent = 'This browser has WebGPU, but not JSPI (WebAssembly stack switching), so Python cannot wait for the browser in the middle of a call. Examples that only draw run; those that read back from the GPU, such as picking, do not. Recent versions of Chrome, Edge and Safari have both.';
   }
 
   // One example runs live in the hero: animated, good looking, and known to work.

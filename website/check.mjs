@@ -54,6 +54,7 @@ const types = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
   '.css': 'text/css', '.json': 'application/json', '.py': 'text/plain',
   '.zip': 'application/zip', '.whl': 'application/zip', '.jpg': 'image/jpeg',
+  '.wasm': 'application/wasm', '.svg': 'image/svg+xml',
 };
 const server = http.createServer((req, res) => {
   const p = path.join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));

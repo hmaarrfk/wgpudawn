@@ -108,6 +108,14 @@ in parentheses.
   the waiting with `await` wherever the code is ours, and keep blocking for
   what an example itself asks. (2026-10-13)
 
+* When a browser on a device you do not have fails, show the message of the
+  error before anything else (not only its stack), and find a way to
+  reproduce it locally: here the same engine with the device's user agent
+  did, after five rounds without. (2026-10-13)
+* A web server of a check must serve what the site serves: `check.mjs` had
+  no type for `.wasm`, which only mattered once the site hosted Pyodide
+  itself, and looked like a hang. (2026-10-13)
+
 **Limits and irreversible steps**
 
 * Publishing (a tag, hence PyPI) only from a commit whose CI run was seen
@@ -119,6 +127,31 @@ in parentheses.
 ## Sessions
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
+
+## 2026-10-13 - Safari on iOS: the cause, and a Pyodide that the site patches
+
+Same session, continued. The human ran `diagnose.html` on an iPhone five more
+times, the last three from a server on the local network, which made each
+round a minute instead of a deployment.
+
+* The reports had the stack of the fatal error and never its message: an
+  Error's `stack` has the message in Chrome, not in Safari. With the message
+  shown it was `SuspendError: JavaScript frames found between
+  WebAssembly.Suspending and WebAssembly.promising`.
+* The frame numbers of the stack were mapped to names with the export table
+  of `pyodide.asm.wasm` (`JsvPromise_Syncify` called by `run_sync`).
+* Cause: CPython's call trampoline. Pyodide's runtime uses a JavaScript one
+  when the user agent is iOS (a workaround for a WebKit bug of iOS 18.3.1),
+  and JSPI cannot suspend through a JavaScript frame. Reproduced here in
+  Playwright's WebKit by giving it the iPhone's user agent; gone when the
+  check is removed, here and on the iPhone.
+* `website/build.py` now serves the core of Pyodide itself with that check
+  limited to browsers without JSPI (`IOS_TRAMPOLINE`), and the WebKit
+  exception of `runner.canBlock()` is gone. All 186 examples still work in
+  Chrome; the human saw the gallery work on the iPhone from the local server.
+* 0.0.1rc1 did not publish (a test failed on `version_info` of a
+  pre-release: fixed). 0.0.1rc2 built and tested everywhere and was refused
+  by PyPI: no trusted publisher matches (owner's to configure).
 
 ## 2026-10-13 - Everything that was due: Dawn, the CI, the first release candidate
 

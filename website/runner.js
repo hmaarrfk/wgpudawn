@@ -68,20 +68,14 @@ export function supportsJSPI() {
 }
 
 // Whether Python can wait for the browser in the middle of a call (the
-// blocking API of wgpu: reading back a buffer, picking). That takes JSPI, and
-// a Pyodide that survives using it: in Safari (seen in 27.0.1, where JSPI
-// itself works) the first pyodide.ffi.run_sync is a fatal error of the
-// interpreter. So there the examples run without it: the device is awaited
-// before the example starts, and what must block raises an error instead.
-// ?jspi=1 and ?jspi=0 override this, to test a browser.
+// blocking API of wgpu: reading back a buffer, picking). That takes JSPI.
+// (In Safari on iOS it also takes the Pyodide that build.py patches: see
+// IOS_TRAMPOLINE there.) ?jspi=0 runs the examples as a browser without it
+// does: the device is awaited before the example starts, and what must block
+// raises an error.
 export function canBlock() {
-  const forced = new URLSearchParams(location.search).get('jspi');
-  if (forced === '0') return false;
-  if (!supportsJSPI()) return false;
-  if (forced === '1') return true;
-  const ua = navigator.userAgent;
-  const webkit = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg\//.test(ua);
-  return !webkit;
+  if (new URLSearchParams(location.search).get('jspi') === '0') return false;
+  return supportsJSPI();
 }
 const blocking = canBlock();
 
@@ -277,12 +271,14 @@ export function boot(first) {
   mark('pyodide');
   removeStaleFiles();
   const url = manifest.pyodide.url;
+  // The core is the site's own copy (build.py patches it); the packages are the distribution's
+  const index = manifest.pyodide.index ? new URL(manifest.pyodide.index, location.href).href : url;
   const packages = [...new Set([...manifest.pyodide.packages, ...(first ? first.packages : [])])];
   // Everything that is needed is asked for now, not when the step before it is done.
   // The standard library with bytecode is the site's (build.py); else that of the distribution
   const stdlib = manifest.pyodide.stdlib;
-  for (const name of ['pyodide.asm.mjs', 'pyodide.asm.wasm', 'pyodide-lock.json', ...(stdlib ? [] : ['python_stdlib.zip'])]) {
-    fetch(url + name).then((response) => response.arrayBuffer()).catch(() => {});
+  for (const name of ['pyodide.asm.mjs', 'pyodide.asm.wasm', 'pyodide-lock.json']) {
+    fetch(index + name).then((response) => response.arrayBuffer()).catch(() => {});
   }
   // From the Cache API when it is there; else Pyodide fetches it, and the
   // download below (the same one, for the browser) keeps it for the next visit
@@ -296,11 +292,12 @@ export function boot(first) {
 
   core = (async () => {
     report('Loading Python');
-    const [{ loadPyodide }, bytes] = await Promise.all([import(url + 'pyodide.mjs'), stdlibKept]);
+    const [{ loadPyodide }, bytes] = await Promise.all([import(index + 'pyodide.mjs'), stdlibKept]);
     const blob = bytes ? URL.createObjectURL(new Blob([bytes])) : '';
     const py = await loadPyodide({
-      indexURL: url,
-      ...(stdlib ? { stdLibURL: blob || new URL(stdlib.url, location.href).href } : {}),
+      indexURL: index,
+      packageBaseUrl: url,
+      stdLibURL: stdlib ? blob || new URL(stdlib.url, location.href).href : url + 'python_stdlib.zip',
       packages,  // fetched and unpacked while the interpreter starts
       stdout: (text) => (sink ? sink(text, 'out') : console.debug(text)),
       stderr: (text) => (sink ? sink(text, 'err') : console.debug(text)),
