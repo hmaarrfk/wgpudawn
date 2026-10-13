@@ -1,7 +1,7 @@
 ---
 name: sync-upstream
 description: Bring wgpudawn up to date with a new wgpu-py release (or wgpu-py main) and optionally a new Dawn release, verify it, push it, and (with "release") tag it so that CI publishes to PyPI. Use for "sync with upstream", "update to wgpu-py X", "bump Dawn", "make a release".
-argument-hint: "[wgpu-py tag or 'main'] [dawn=<tag>|dawn=latest] [release]"
+argument-hint: "[wgpu-py tag or 'main'] [dawn=latest] [release]"
 ---
 
 # Sync wgpudawn with wgpu-py (and Dawn)
@@ -17,7 +17,7 @@ Arguments (all optional): `$ARGUMENTS`
 
 * a wgpu-py tag (`v0.33.0`) or `main`: the target. Default: the latest wgpu-py
   release tag.
-* `dawn=<tag>` / `dawn=latest`: also move to that Dawn release. Default: keep
+* `dawn=latest`: also update Dawn, with the `update-dawn` skill. Default: keep
   Dawn, unless the port needs a newer one (say so in the report).
 * `release`: after CI is green on main, push the version tag. Without it, stop
   before tagging and print the command.
@@ -76,20 +76,11 @@ Resolve every `FIXME` that codegen adds (unknown C function or struct field,
 new or changed IDL method), then run it again until it is stable.
 `wgpudawn/resources/codegen_report.md` must not contain `ERROR`.
 
-## 4. Dawn bump (only when asked or needed)
+## 4. Dawn
 
-1. Pick the tag from https://github.com/google/dawn/releases (`gh release list -R google/dawn`).
-   It must have an `emdawnwebgpu_pkg-<tag>.zip` asset.
-2. Update `DAWN_TAG` and `EMDAWN_ZIP_SHA256` in `build_cffi.py`, `dawn_version`
-   in `wgpudawn/_lib/__init__.py`, and `dawn.tag` in `upstream.json`.
-3. Regenerate the cdef from the `webgpu.h` in that zip (see the docstring of
-   `tools/gen_cdef.py`): `webgpu_cdef.h`, and `webgpu_native_extra_cdef.h`
-   from the native header. `python tools/gen_cdef.py diff ...` must still show
-   that the Emdawnwebgpu header is a subset of the native one.
-4. Rebuild Dawn: `python tools/build_dawn.py --prefix <prefix>` (about 5
-   minutes on a fast machine), then rebuild the extension (step 5).
-5. Run codegen (step 3). Check Dawn's renamed/removed enum values in
-   `_mappings.py` against their use in `_api.py`.
+Dawn is updated on its own, by the `update-dawn` skill. Do that first (or
+after), as a separate commit, when `dawn=` is given or when the port needs
+API that the pinned Dawn release does not have.
 
 ## 5. Build and verify
 
@@ -131,15 +122,19 @@ watch CI (`gh run watch`, or `gh run list --branch main`): all jobs of the `CI`
 workflow must pass, on all six platforms. Fix what fails and push again; a
 platform-specific failure is not a reason to drop the platform.
 
-The version is the git tag; there is no version number in the source.
+The version is the git tag (no `v`); there is no version number in the source.
+It has four numbers, `X.Y.Z.N`: `X.Y.Z` is the wgpu-py version that wgpudawn
+mirrors, and `N` counts the wgpudawn releases for it (Dawn updates, fixes),
+starting at 0.
 
-* Synced to a wgpu-py release `vX.Y.Z` -> tag `X.Y.Z` (no `v`).
-* A wgpudawn-only fix or a Dawn bump on top of an already released `X.Y.Z` ->
-  tag `X.Y.Z.post1`, `.post2`, ...
-* Synced to wgpu-py `main` -> no tag.
+* Synced to a wgpu-py release `vX.Y.Z` -> tag `X.Y.Z.0`.
+* A wgpudawn-only fix or a Dawn update on top of that -> the next `N`
+  (`git tag --list "X.Y.Z.*"` shows the last one).
+* Synced to wgpu-py `main` between releases -> also the next `N` of the last
+  wgpu-py release, when it is worth releasing; otherwise no tag.
 
 With the `release` argument, once CI is green for the commit:
-`git tag X.Y.Z && git push origin X.Y.Z`. The tag build publishes to PyPI,
+`git tag X.Y.Z.N && git push origin X.Y.Z.N`. The tag build publishes to PyPI,
 which cannot be undone, so only tag a commit whose CI run you saw pass, and
 check afterwards that the publish job succeeded and that
 `pip index versions wgpudawn` shows the version. Without `release`, print those

@@ -15,7 +15,8 @@ wgpu-py, version for version. Read `README.md` first.
   stand-in for wgpu-py that calls it. Never ship that, and never add a `wgpu`
   module to the wgpudawn package.
 * The version is the git tag (miniver); tags have no `v` prefix. Pushing a tag
-  publishes to PyPI.
+  publishes to PyPI. Scheme: `X.Y.Z.N` = mirrored wgpu-py version + wgpudawn
+  release counter (see README).
 
 Dev loop:
 
@@ -26,4 +27,5 @@ pip install --no-deps ./tests/wgpu_shim
 ruff format . && ruff check . && pytest tests codegen
 ```
 
-To update to a new wgpu-py or Dawn release, or to release: `/sync-upstream`.
+To update Dawn: `/update-dawn`. To port a new wgpu-py release: `/sync-upstream`.
+Both release with the `release` argument.

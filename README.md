@@ -124,14 +124,26 @@ How it works:
 
 ## Versions and releases
 
-The version comes from the git tag (there is no version number in the source).
-Pushing a tag such as `0.32.0` builds and tests the wheels, and publishes them
-to PyPI. `upstream.json` records the versions of wgpu-py and Dawn that the
-current code corresponds to.
+A version has four numbers, `X.Y.Z.N`: `X.Y.Z` is the version of wgpu-py that
+it mirrors (same API), and `N` counts the releases of wgpudawn for that
+version, which mostly are updates of Dawn. So `wgpudawn~=0.32.0` is "the API of
+wgpu-py 0.32.0, on the newest Dawn". (The first releases, `0.0.x`, predate
+this scheme.)
 
-To update to a new version of wgpu-py or Dawn, see
-`.claude/skills/sync-upstream/SKILL.md`. With Claude Code:
-`claude "/sync-upstream"`.
+The version comes from the git tag; there is no version number in the source.
+Pushing a tag builds and tests the wheels, and publishes them to PyPI.
+`upstream.json` records the versions of wgpu-py and Dawn that the code
+corresponds to.
+
+Maintenance is done by AI agents, with [Claude Code](https://claude.com/claude-code)
+skills that are part of this repository:
+
+```sh
+claude "/update-dawn release"       # to the latest Dawn release, verify, release X.Y.Z.N+1
+claude "/sync-upstream release"     # port a new wgpu-py release, verify, release X.Y.Z.0
+```
+
+Without `release`, they stop before tagging. See `.claude/skills/`.
 
 ## License
 
