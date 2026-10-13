@@ -1,19 +1,16 @@
 import random
 import ctypes
-import sys
 
 import numpy as np
 
 import wgpudawn as wgpu
 from pytest import skip
 from testutils import run_tests, get_default_device
-from testutils import can_use_wgpu_lib, is_ci
+from testutils import can_use_wgpu_lib
 
 
 if not can_use_wgpu_lib:
     skip("Skipping tests that need the wgpu lib", allow_module_level=True)
-elif is_ci and sys.platform == "win32":
-    skip("These tests fail on dx12 for some reason", allow_module_level=True)
 
 # %% 1D
 

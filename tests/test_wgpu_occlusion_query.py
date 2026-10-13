@@ -3,18 +3,15 @@ Test occlusion queries.
 """
 
 import numpy as np
-import sys
 
 import wgpudawn as wgpu
 from pytest import skip
 from testutils import run_tests, get_default_device
-from testutils import can_use_wgpu_lib, is_ci
+from testutils import can_use_wgpu_lib
 from wgpudawn import flags
 
 if not can_use_wgpu_lib:
     skip("Skipping tests that need the wgpu lib", allow_module_level=True)
-elif is_ci and sys.platform == "win32":
-    skip("These tests fail on dx12 for some reason", allow_module_level=True)
 
 
 default_shader_source = """

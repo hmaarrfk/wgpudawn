@@ -2,12 +2,11 @@ import random
 import ctypes
 import base64
 from ctypes import c_int32, c_ubyte
-import sys
 
 import wgpudawn as wgpu
 from wgpudawn.utils.compute import compute_with_buffers
-from pytest import skip, mark, raises
-from testutils import run_tests, can_use_wgpu_lib, is_ci, iters_equal
+from pytest import skip, raises
+from testutils import run_tests, can_use_wgpu_lib, iters_equal
 
 
 if not can_use_wgpu_lib:
@@ -101,9 +100,6 @@ def test_compute_0_1_int():
     assert out[0].cast("i").tolist() == list(range(100))
 
 
-@mark.skipif(
-    is_ci and sys.platform == "win32", reason="Cannot use SpirV shader on dx12"
-)
 def test_compute_0_1_spirv():
     compute_shader = simple_compute_shader_spirv
     assert isinstance(compute_shader, bytes)

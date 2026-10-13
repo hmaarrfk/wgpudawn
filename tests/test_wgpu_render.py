@@ -6,7 +6,6 @@ import ctypes
 import platform
 
 import numpy as np
-import sys
 
 import pytest
 
@@ -15,7 +14,6 @@ from pytest import skip
 from testutils import (
     run_tests,
     can_use_wgpu_lib,
-    is_ci,
     get_default_device,
     adapter_summary,
 )
@@ -25,8 +23,6 @@ from renderutils import render_to_screen  # noqa: F401 - sometimes used for debu
 
 if not can_use_wgpu_lib:
     skip("Skipping tests that need the wgpu lib", allow_module_level=True)
-elif is_ci and sys.platform == "win32":
-    skip("These tests fail on dx12 for some reason", allow_module_level=True)
 
 
 DEFAULT_SHADER = """
