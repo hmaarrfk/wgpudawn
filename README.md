@@ -1,4 +1,4 @@
-<h1><img src="website/logo.svg" alt="" width="40" height="40" align="top"> wgpudawn</h1>
+<h1><img src="https://raw.githubusercontent.com/hmaarrfk/wgpudawn/main/website/logo.svg" alt="" width="40" height="40" align="top"> wgpudawn</h1>
 
 WebGPU for Python, on [Dawn](https://dawn.googlesource.com/dawn).
 
