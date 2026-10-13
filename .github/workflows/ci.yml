@@ -34,8 +34,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@v7
+    - uses: actions/setup-python@v7
       with:
         python-version: "3.13"
     - run: pip install ruff pytest cffi numpy
@@ -49,16 +49,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0  # the version comes from git tags
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v7
       with:
         python-version: "3.13"
     - run: pip install build
     - run: python -m build --sdist
     - run: ls -l dist && tar -tzf dist/*.tar.gz
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: dist-sdist
         path: dist/*.tar.gz
@@ -81,10 +81,10 @@ jobs:
     env:
       MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0  # the version comes from git tags
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v7
       with:
         python-version: "3.12"
     - name: Locate Dawn
@@ -101,7 +101,7 @@ jobs:
         echo "DAWN_PREFIX=$prefix" >> $GITHUB_ENV
     - name: Restore Dawn from cache
       id: dawn-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: ${{ steps.dawn.outputs.prefix }}
         key: dawn-${{ steps.dawn.outputs.tag }}-${{ matrix.name }}-${{ matrix.os }}-${{ steps.dawn.outputs.config }}
@@ -122,7 +122,7 @@ jobs:
         python tools/build_dawn.py --prefix "$DAWN_PREFIX" --work-dir "$RUNNER_TEMP/db"
     - name: Save Dawn to cache
       if: steps.dawn-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: ${{ steps.dawn.outputs.prefix }}
         key: ${{ steps.dawn-cache.outputs.cache-primary-key }}
@@ -133,7 +133,7 @@ jobs:
         CIBW_ENVIRONMENT_LINUX: DAWN_PREFIX=/host${{ steps.dawn.outputs.prefix }}
     - run: ls -l wheelhouse
       shell: bash
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: dist-wheel-${{ matrix.name }}
         path: wheelhouse/*.whl
@@ -163,12 +163,12 @@ jobs:
       run:
         shell: bash
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@v7
+    - uses: actions/download-artifact@v8
       with:
         name: dist-wheel-${{ matrix.name }}
         path: dist
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python }}
     - name: Install lavapipe (software Vulkan)
@@ -198,20 +198,20 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: The pinned commit of pygfx (upstream.json)
       id: pygfx
       run: echo "ref=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['commit'])")" >> $GITHUB_OUTPUT
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         repository: pygfx/pygfx
         ref: ${{ steps.pygfx.outputs.ref }}
         path: pygfx-src
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: dist-wheel-linux-x86_64
         path: dist
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v7
       with:
         python-version: "3.13"
     - name: Install llvmpipe and lavapipe for offscreen canvas
@@ -250,10 +250,10 @@ jobs:
     env:
       PYODIDE_XBUILDENV_PATH: /home/runner/xbuildenv
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v7
       with:
         python-version: "3.14"
     - name: Install pyodide-build
@@ -268,7 +268,7 @@ jobs:
         emcc --version | head -1
         pyodide build --exports pyinit -o dist
         ls -l dist
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: dist-wheel-pyodide
         path: dist/*.whl
@@ -277,11 +277,11 @@ jobs:
         source ${PYODIDE_XBUILDENV_PATH}/${PYODIDE_VERSION}/emsdk/emsdk_env.sh
         pip install cmake ninja
         website/build_freetype.sh web-wheels
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: web-wheels
         path: web-wheels/*.whl
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v7
       with:
         node-version: "26"
     - name: Install lavapipe
@@ -312,29 +312,29 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: The pinned commit of pygfx (upstream.json)
       id: pygfx
       run: echo "ref=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['commit'])")" >> $GITHUB_OUTPUT
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         repository: pygfx/pygfx
         ref: ${{ steps.pygfx.outputs.ref }}
         path: pygfx-src
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: dist-wheel-pyodide
         path: web-wheels
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: web-wheels
         path: web-wheels
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v7
       with:
         # The Python of Pyodide: the build compiles the packages to bytecode
         # with it, which makes the site start faster
         python-version: "3.14"
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v7
       with:
         node-version: "24"
     - name: Build the site
@@ -352,12 +352,12 @@ jobs:
         google-chrome --version
         cd website && npm install --no-audit --no-fund
         node check.mjs ../site --jobs 4 --timeout 240 --expect expected.json --keep-shots
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       if: always()
       with:
         name: website
         path: site
-    - uses: actions/upload-pages-artifact@v3
+    - uses: actions/upload-pages-artifact@v5
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       with:
         path: site
@@ -376,7 +376,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
     - id: deployment
-      uses: actions/deploy-pages@v4
+      uses: actions/deploy-pages@v5
 
   publish:
     name: Publish to PyPI
@@ -390,7 +390,7 @@ jobs:
     permissions:
       id-token: write  # trusted publishing: no token needed
     steps:
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         pattern: dist-*
         path: dist
