@@ -158,7 +158,9 @@ def check_pyodide():
     places = {
         "website/pyodide.json version": site["version"],
         "website/pyodide.json url": re.search(r"/v([\d.]+)/", site["url"]).group(1),
-        "wheels.yml PYODIDE_VERSION": re.search(r'PYODIDE_VERSION: "(.+?)"', ci).group(1),
+        "wheels.yml PYODIDE_VERSION": re.search(r'PYODIDE_VERSION: "(.+?)"', ci).group(
+            1
+        ),
         "tests/pyodide/package.json": json.loads(
             read("tests", "pyodide", "package.json")
         )["dependencies"]["pyodide"],
