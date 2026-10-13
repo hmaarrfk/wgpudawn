@@ -6,7 +6,10 @@ The API of wgpu-py, with Dawn as the (only) backend.
 
 # ruff: noqa: F401, F403
 
+import re
+
 from ._coreutils import logger
+
 from ._version import __version__
 from ._diagnostics import diagnostics, DiagnosticsBase
 from .flags import *
@@ -24,9 +27,14 @@ from ._as_wgpu import install_as_wgpu
 # the same behavior as far as the backends allow. See upstream.json in the repo.
 wgpu_py_version = "0.32.0"
 
-version_info = tuple(
-    int(i) if i.isdecimal() else i for i in __version__.split("+")[0].split(".")
-)
+
+def _version_info(version):
+    # "0.32.0.1" -> (0, 32, 0, 1); "0.0.1rc1" -> (0, 0, 1, "rc1"); "+local" is dropped
+    release, rest = re.match(r"(\d+(?:\.\d+)*)\.?(.*)", version.split("+")[0]).groups()
+    return tuple(int(i) for i in release.split(".")) + ((rest,) if rest else ())
+
+
+version_info = _version_info(__version__)
 
 # The API entrypoint, from wgpudawn.classes - gets replaced when a backend loads.
 gpu = GPU()  # noqa: F405

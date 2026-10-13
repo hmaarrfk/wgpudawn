@@ -44,6 +44,14 @@ def test_dawn_version():
 def test_version():
     assert isinstance(wgpudawn.__version__, str)
     assert all(isinstance(i, int) for i in wgpudawn.version_info[:3])
+    # Also for the versions that tags give: pre-releases and X.Y.Z.N
+    for version, info in [
+        ("0.32.0.1", (0, 32, 0, 1)),
+        ("0.0.1rc1", (0, 0, 1, "rc1")),
+        ("0.0.1.dev3+g1234abc", (0, 0, 1, "dev3")),
+        ("0.0.0+g1234abc.dirty", (0, 0, 0)),
+    ]:
+        assert wgpudawn._version_info(version) == info
 
 
 if __name__ == "__main__":
