@@ -780,6 +780,9 @@ def main():
             "wgpudawn_commit": git(ROOT, "rev-parse", "HEAD"),
             "pygfx": wheels["pygfx"].split("-")[1],
             "pygfx_commit": pygfx_commit,
+            # Where that commit is: pygfx/pygfx, or a fork with fixes on top
+            "pygfx_repository": upstream["pygfx"]["repository"],
+            "pygfx_upstream": upstream["pygfx"].get("upstream", ""),
             "dawn": upstream["dawn"]["tag"],
             "wgpu_py": upstream["wgpu-py"]["version"],
         },

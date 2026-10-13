@@ -1,17 +1,8 @@
 {
   "_comment": "Why an example that is run on the website does not work (yet). Shown next to the example. Keys are example ids; update-website maintains this.",
-  "feature_demo/volume_render1": "pygfx's volume shader calls textureSample inside a loop whose length depends on the pixel. WGSL only allows that in uniform control flow; Dawn's shader compiler (the one in Chrome) enforces the rule, wgpu-native does not. Needs a fix in pygfx (textureSampleLevel).",
-  "feature_demo/volume_render2": "Same as volume_render1: textureSample in non-uniform control flow in pygfx's volume shader, which Dawn rejects per the WGSL spec.",
-  "feature_demo/volume_iso_render": "Same as volume_render1: textureSample in non-uniform control flow in pygfx's volume shader, which Dawn rejects per the WGSL spec.",
-  "feature_demo/volume_minip_render": "Same as volume_render1: textureSample in non-uniform control flow in pygfx's volume shader, which Dawn rejects per the WGSL spec.",
-  "feature_demo/world_bounding_box": "Uses pygfx's volume shader, which calls textureSample in non-uniform control flow. Dawn rejects that per the WGSL spec.",
-  "feature_demo/mesh_toon2": "pygfx's toon shader samples its gradient map with textureSample inside the light loop, after a conditional continue. WGSL only allows that in uniform control flow, and Dawn enforces it.",
-  "feature_demo/point_sprites": "pygfx's point shader calls textureSample for the sprite inside a branch on the sprite coordinate. WGSL only allows that in uniform control flow, and Dawn enforces it.",
-  "feature_demo/anisotropy_barn_lamp": "This material makes pygfx use 5 bind groups. WebGPU guarantees 4, which is also Dawn's maximum; wgpu-native allows 8. Needs a change in pygfx.",
-  "feature_demo/clearcoat2": "This material makes pygfx use 5 bind groups. WebGPU guarantees 4, which is also Dawn's maximum; wgpu-native allows 8. Needs a change in pygfx.",
-  "feature_demo/iridescence": "This material makes pygfx use 5 bind groups. WebGPU guarantees 4, which is also Dawn's maximum; wgpu-native allows 8. Needs a change in pygfx.",
+  "feature_demo/anisotropy_barn_lamp": "This material makes pygfx use 13 uniform buffers in the fragment shader (one per texture map). WebGPU's default limit is 12. Needs a change in pygfx.",
   "feature_demo/geometry_plane": "Plays a video (cockatoo.mp4), which needs PyAV to decode. PyAV (FFmpeg) has no build for Pyodide.",
   "other/sponza_scene": "Needs the glTF-Sample-Assets repository (hundreds of MB) next to the examples; the site does not ship it.",
   "validation/validate_view_offset": "Draws an offscreen canvas from inside the draw callback of the visible one and waits for the result. In a browser, a draw callback cannot block (no JSPI stack there), so the readback is not available.",
-  "other/image_histogram": "The compute shader of this example writes NaN as bitcast<f32>(0x7fc00000u). WGSL evaluates that at compile time and does not allow a constant that is NaN; Dawn enforces the rule. Needs a change in the example."
+  "other/image_histogram": "The compute shader of this example has 1024 invocations per workgroup (16 x 16 x 4). WebGPU's default limit is 256, and a browser gives no more unless it is asked. Needs a change in the example."
 }

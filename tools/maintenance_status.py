@@ -140,9 +140,15 @@ def check_dawn():
 
 
 def check_pygfx():
-    pin = json.loads(read("upstream.json"))["pygfx"]["commit"]
-    ahead = gh(f"repos/pygfx/pygfx/compare/{pin}...main", ".ahead_by")
+    pygfx = json.loads(read("upstream.json"))["pygfx"]
+    pin = pygfx["commit"]
+    # The pin can be on a fork (fixes that are not in pygfx yet)
+    owner = pygfx["repository"].rstrip("/").split("/")[-2]
+    base = pin if owner == "pygfx" else f"{owner}:{pin}"
+    ahead = gh(f"repos/pygfx/pygfx/compare/{base}...main", ".ahead_by")
     detail = f"pinned {pin[:7]}; pygfx main is {ahead} commits ahead"
+    if owner != "pygfx":
+        detail += f"; the pin is on the fork of {owner} (issue 2)"
     return ("DUE" if ahead != "0" else "ok"), detail
 
 

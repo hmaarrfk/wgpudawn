@@ -124,9 +124,35 @@ in parentheses.
 * Outward actions on other people's projects (issues, pull requests upstream)
   are proposed to the human with the text ready, not done. (2026-10-12)
 
+* A fix removes the first error, not the last. After fixing what an example
+  reported, run it again in the browser before saying that it works: the
+  limits of a browser are lower than those of a native device. (2026-10-13)
+
 ## Sessions
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
+
+## 2026-10-13 - The website on a branch of pygfx with the fixes it needs
+
+Same session, continued (15.4 h wall clock, 48 human prompts by now). The
+human opened an example in Safari on a Mac and pasted the error; then asked
+for a branch of pygfx with what needs fixing there, an issue that lists such
+branches, and whether the site had them.
+
+* Safari rejects `let tex: texture_2d<f32> = colorTex;` in pygfx's
+  anti-aliasing shaders. The specification agrees with Safari; Tint and naga
+  let it pass. Found by dumping the shaders natively and reading line 114.
+* `hmaarrfk/pygfx@webgpu-portability`: four commits (textureSample in uniform
+  control flow, the physical material within 4 bind groups, the texture view
+  of ComputeShader, the `let`). Checked on wgpudawn and on wgpu-native, where
+  the pictures are the same before and after. Not offered upstream: issue 2
+  lists the branches of other projects and why each matters.
+* The site and the pygfx job of CI now build from that branch
+  (`upstream.json` has the repository too). Nine more examples work; the
+  site says that pygfx has fixes on top, and no longer says "unmodified".
+* Two examples got past their first error and met the next limit: 13 uniform
+  buffers per stage (12 guaranteed), 1024 invocations per workgroup (256).
+  The notes say that now.
 
 ## 2026-10-13 - Safari on iOS: the cause, and a Pyodide that the site patches
 

@@ -202,10 +202,12 @@ jobs:
     - uses: actions/checkout@v7
     - name: The pinned commit of pygfx (upstream.json)
       id: pygfx
-      run: echo "ref=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['commit'])")" >> $GITHUB_OUTPUT
+      run: |
+        echo "ref=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['commit'])")" >> $GITHUB_OUTPUT
+        echo "repository=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['repository'].split('github.com/')[1])")" >> $GITHUB_OUTPUT
     - uses: actions/checkout@v7
       with:
-        repository: pygfx/pygfx
+        repository: ${{ steps.pygfx.outputs.repository }}
         ref: ${{ steps.pygfx.outputs.ref }}
         path: pygfx-src
     - uses: actions/download-artifact@v8
@@ -316,10 +318,12 @@ jobs:
     - uses: actions/checkout@v7
     - name: The pinned commit of pygfx (upstream.json)
       id: pygfx
-      run: echo "ref=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['commit'])")" >> $GITHUB_OUTPUT
+      run: |
+        echo "ref=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['commit'])")" >> $GITHUB_OUTPUT
+        echo "repository=$(python3 -c "import json; print(json.load(open('upstream.json'))['pygfx']['repository'].split('github.com/')[1])")" >> $GITHUB_OUTPUT
     - uses: actions/checkout@v7
       with:
-        repository: pygfx/pygfx
+        repository: ${{ steps.pygfx.outputs.repository }}
         ref: ${{ steps.pygfx.outputs.ref }}
         path: pygfx-src
     - uses: actions/download-artifact@v8

@@ -65,7 +65,7 @@ if (/[?&]ex=/.test(location.search) || /run\.html$/.test(location.pathname)) doc
           Every picture below is an example of <a class="link" href="https://github.com/pygfx/pygfx" target="_blank" rel="noopener">pygfx</a>,
           drawn by Dawn, the WebGPU of your browser, through
           <a class="link" href="https://github.com/hmaarrfk/wgpudawn" target="_blank" rel="noopener">wgpudawn</a>, a Python package.
-          Open one and the unmodified Python source runs right here. There is no server.
+          Open one and its Python source runs right here. There is no server.
         </p>
 
         <div class="tally" id="tally" hidden>
@@ -212,7 +212,9 @@ if (/[?&]ex=/.test(location.search) || /run\.html$/.test(location.pathname)) doc
       </p>
       <p>
         The examples are those of <a class="link" href="https://github.com/pygfx/pygfx" target="_blank" rel="noopener">pygfx</a>,
-        unmodified, with credit and thanks to its authors.
+        with credit and thanks to its authors. They run on pygfx with a
+        <a class="link" href="https://github.com/hmaarrfk/wgpudawn/issues/2" target="_blank" rel="noopener">few fixes</a>
+        for what browsers are stricter about than wgpu-native; one example (<code>image_histogram</code>) is changed by them.
       </p>
     </div>
     <div>
@@ -236,7 +238,7 @@ if (/[?&]ex=/.test(location.search) || /run\.html$/.test(location.pathname)) doc
 <footer class="foot" id="foot-run">
   <div class="wrap">
     <p class="fine" style="border:0;padding-top:0">
-      An example of <a class="link" href="https://github.com/pygfx/pygfx" target="_blank" rel="noopener">pygfx</a>, unmodified, with credit to its authors.
+      An example of <a class="link" href="https://github.com/pygfx/pygfx" target="_blank" rel="noopener">pygfx</a>, with credit to its authors.
       It runs in this page on Dawn's WebGPU through <a class="link" href="https://github.com/hmaarrfk/wgpudawn" target="_blank" rel="noopener">wgpudawn</a>,
       a Dawn reference implementation that follows the architecture and design of <a class="link" href="https://github.com/pygfx/wgpu-py" target="_blank" rel="noopener">wgpu-py</a>, maintained by AI agents.
       Needs WebGPU: recent Chrome, Edge or Safari.

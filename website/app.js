@@ -291,7 +291,7 @@ function openExample(example, how) {
   $('description').textContent = example.description;
   $('category').textContent = manifest.categories.find((c) => c.id === example.category).title;
   $('lines').textContent = `${example.lines} lines`;
-  $('github').href = `https://github.com/pygfx/pygfx/blob/${manifest.versions.pygfx_commit}/examples/${example.id}.py`;
+  $('github').href = `${manifest.versions.pygfx_repository || 'https://github.com/pygfx/pygfx'}/blob/${manifest.versions.pygfx_commit}/examples/${example.id}.py`;
   for (const [id, other] of [['prev', examples[index - 1]], ['next', examples[index + 1]]]) {
     for (const el of [$(id), $(id + '2')]) {
       el.hidden = !other;
@@ -616,8 +616,9 @@ function buildGallery() {
   const versions = [
     ['wgpudawn', v.wgpudawn, v.wgpudawn_commit && `https://github.com/hmaarrfk/wgpudawn/tree/${v.wgpudawn_commit}`],
     ['Dawn', v.dawn],
-    ['pygfx', [v.pygfx, v.pygfx_commit && '@ ' + short(v.pygfx_commit)].filter(Boolean).join(' '),
-      v.pygfx_commit && `https://github.com/pygfx/pygfx/tree/${v.pygfx_commit}`],
+    // A fork, when the site needs fixes that are not in pygfx yet
+    ['pygfx', [v.pygfx, v.pygfx_commit && '@ ' + short(v.pygfx_commit), v.pygfx_upstream && '(with fixes)'].filter(Boolean).join(' '),
+      v.pygfx_commit && `${v.pygfx_repository || 'https://github.com/pygfx/pygfx'}/tree/${v.pygfx_commit}`],
     ['wgpu-py API', v.wgpu_py],
     ['Pyodide', manifest.pyodide.version],
   ];

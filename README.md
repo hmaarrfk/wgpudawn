@@ -44,7 +44,7 @@ version of wgpudawn mirrors.
 **[The gallery](https://www.markharfouche.com/wgpudawn/)** runs the examples of
 [pygfx](https://github.com/pygfx/pygfx) in your browser, on wgpudawn: Pyodide,
 the Pyodide wheel of wgpudawn (which uses the WebGPU of the browser through
-Dawn's Emdawnwebgpu) and pygfx, unmodified. It needs a browser with WebGPU and
+Dawn's Emdawnwebgpu) and pygfx (for now with a few fixes on top, see issue 2). It needs a browser with WebGPU and
 JSPI, such as a recent Chrome or Edge. Every example is run in headless Chrome
 when the site is built; the gallery shows what works and what does not.
 
