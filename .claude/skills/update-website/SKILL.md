@@ -88,6 +88,12 @@ CHROME_FLAGS="--use-angle=vulkan --ignore-gpu-blocklist" \
 Then walk through them warm, on the GPU: `node website/check.mjs ../site --warm`
 (same `CHROME_FLAGS`). It must exit 0 and agree with the cold run.
 
+`node website/check.mjs ../site --no-blocking` runs the examples as Safari
+does, where Python cannot block (Pyodide's `run_sync` crashes there): all but
+the few that read back from the GPU or configure the device must still start.
+It overwrites `results.json`, so run the normal check last. After a change to
+`website/diagnose.html`, open it with `?auto=1` and see every step pass.
+
 (`CHROME_FLAGS="--disable-gpu"` with `--keep-shots` is what CI sees: software
 WebGPU, where Chrome loses the device about a second after an example starts
 drawing and the canvas stays black. "ok" there means "started and reported no

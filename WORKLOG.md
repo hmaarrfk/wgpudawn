@@ -101,6 +101,13 @@ in parentheses.
   mattered (the examples that were said to be broken) before acting on it.
   (2026-10-12)
 
+* A page that diagnoses must itself be run after every change of what it
+  tests: the wgpudawn step of `diagnose.html` broke when the site moved from
+  wheels to a bundle, and nobody saw, because the page was only read. (2026-10-13)
+* `can_run_sync()` being true does not mean `run_sync` works (Safari 27). Do
+  the waiting with `await` wherever the code is ours, and keep blocking for
+  what an example itself asks. (2026-10-13)
+
 **Limits and irreversible steps**
 
 * Publishing (a tag, hence PyPI) only from a commit whose CI run was seen
@@ -112,6 +119,39 @@ in parentheses.
 ## Sessions
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
+
+## 2026-10-13 - Safari: examples without stack switching
+
+Same session as the entry below, continued after the human ran
+`diagnose.html` on an iPhone (Safari 27.0.1) and pasted the report. Totals of
+the whole session at this point: 9.56 h wall clock, 4.14 h agent working, 28
+human prompts, `claude-opus-5-5` (Anthropic), $60.14 at API list prices.
+
+**What the report said.** WebGPU works, JSPI exists and works in a bare
+WebAssembly module, `pyodide.ffi.can_run_sync()` is true, and the first
+`pyodide.ffi.run_sync` is a fatal error of the interpreter. Every example
+used it at least once: to get the GPU device.
+
+**What changed**
+
+* `webhost.warm()` awaits the adapter and the device before an example runs,
+  so an example that only draws needs no stack switch, in any browser.
+* Where blocking cannot work (`runner.canBlock()`: no JSPI, or WebKit;
+  `?jspi=0` / `?jspi=1` override it), `can_run_sync` says no, so that the
+  blocking API raises an exception instead of crashing the interpreter.
+* `check.mjs --no-blocking` checks the site as such a browser runs it: 182 of
+  the 186 working examples start without an error in Chrome that way. The
+  four that need blocking read back from the GPU (`offscreen`,
+  `hirez_screenshot`) or configure the device themselves (`gpu_selection`,
+  `reactive_rendering`).
+* `diagnose.html`: the tests that do not block run first, so that a report
+  from Safari says whether the rest works; its wgpudawn step asked for a wheel
+  that the site no longer has (it failed everywhere) and now uses the bundle.
+
+**Not verified.** No Safari here: that the examples now run on the iPhone is
+expected from the report, not seen. And the pictures of this check were
+blank, with the previous build too (headless Chrome did not show the canvas
+on this machine at the time), so "works" here is "started without an error".
 
 ## 2026-10-13 - Creating the project: package, wheels, website, maintenance
 

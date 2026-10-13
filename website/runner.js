@@ -55,7 +55,8 @@ captureConsole();
 export function describeBrowser() {
   const gpu = supportsWebGPU() ? 'yes' : 'no';
   const jspi = supportsJSPI() ? 'yes' : 'no';
-  return `${navigator.userAgent} | WebGPU: ${gpu} | JSPI: ${jspi}`;
+  const blocking = canBlock() ? 'yes' : 'no';
+  return `${navigator.userAgent} | WebGPU: ${gpu} | JSPI: ${jspi} | Python can block: ${blocking}`;
 }
 
 export function supportsWebGPU() {
@@ -65,6 +66,24 @@ export function supportsWebGPU() {
 export function supportsJSPI() {
   return typeof WebAssembly !== 'undefined' && typeof WebAssembly.Suspending === 'function';
 }
+
+// Whether Python can wait for the browser in the middle of a call (the
+// blocking API of wgpu: reading back a buffer, picking). That takes JSPI, and
+// a Pyodide that survives using it: in Safari (seen in 27.0.1, where JSPI
+// itself works) the first pyodide.ffi.run_sync is a fatal error of the
+// interpreter. So there the examples run without it: the device is awaited
+// before the example starts, and what must block raises an error instead.
+// ?jspi=1 and ?jspi=0 override this, to test a browser.
+export function canBlock() {
+  const forced = new URLSearchParams(location.search).get('jspi');
+  if (forced === '0') return false;
+  if (!supportsJSPI()) return false;
+  if (forced === '1') return true;
+  const ua = navigator.userAgent;
+  const webkit = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg\//.test(ua);
+  return !webkit;
+}
+const blocking = canBlock();
 
 // -------------------------------------------------------------- first frame
 
@@ -310,14 +329,15 @@ export function boot(first) {
     };
     py.globals.set('site_knows', knows);
     py.globals.set('site_load', load);
+    py.globals.set('site_blocking', blocking);
     // pygfx is imported here, not by the first example: when the visitor
     // opens one, this is done
     await py.runPythonAsync(`
 import sys
 sys.path.insert(0, "/site/packages")
 import webhost
-webhost.setup(site_knows, site_load)
-del site_knows, site_load
+webhost.setup(site_knows, site_load, site_blocking)
+del site_knows, site_load, site_blocking
 import pygfx, rendercanvas.auto
 `);
     mark('ready');
@@ -467,9 +487,10 @@ export function run(example, options = {}) {
       const number = runs;
       if (example.isolate) taint('the previous example configured the interpreter');
       py.globals.set('site_run', py.toPy([example.id, example.data, imagesOf(example)]));
-      // runPythonAsync, so that the blocking API of wgpu works (via JSPI)
+      // runPythonAsync, so that the blocking API of wgpu works (via JSPI).
+      // The device is awaited first: no example needs JSPI just to start
       executing = mine;
-      await Promise.race([py.runPythonAsync('import webhost\nwebhost.run(*site_run)'), fatal]);
+      await Promise.race([py.runPythonAsync(`import webhost\n${example.isolate ? '' : 'await webhost.warm()\n'}webhost.run(*site_run)`), fatal]);
       mark('ran');
       return { run: number, lazy: [...lazy], lost: deviceLost(py) };
     } finally {

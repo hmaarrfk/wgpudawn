@@ -47,6 +47,8 @@ const failedOnly = args.includes('--failed');  // only what did not work last ti
 // site already has (website/shots, taken on a machine with a GPU) and only
 // record what works.
 const keepShots = args.includes('--keep-shots');
+// Run as a browser where Python cannot block does (Safari): no stack switching
+const noBlocking = args.includes('--no-blocking') ? '&jspi=0' : '';
 
 const types = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
@@ -93,7 +95,7 @@ async function checkExample(browser, example) {
       else if (text.startsWith('EXAMPLE FAIL: ')) done({ ok: false, error: text.slice(14) });
     });
     tab.on('pageerror', (e) => done({ ok: false, error: 'pageerror: ' + e.message }));
-    tab.goto(`${origin}/run.html?check=1&ex=${encodeURIComponent(example.id)}`)
+    tab.goto(`${origin}/run.html?check=1&ex=${encodeURIComponent(example.id)}${noBlocking}`)
       .catch((e) => done({ ok: false, error: String(e) }));
   });
   const result = { ok: outcome.ok, seconds: Math.round((Date.now() - started) / 100) / 10 };

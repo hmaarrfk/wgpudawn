@@ -36,6 +36,11 @@ _placed = set()  # data entries that are in EXAMPLES now
 _images = set()  # sample images that are in IMAGES now
 _before = None  # the state of the interpreter that run() changed
 
+NO_BLOCKING = (
+    "in this browser Python cannot wait for the browser in the middle of a call "
+    "(Pyodide's run_sync crashes in Safari)."
+)
+
 
 class LazyPackages(importlib.abc.MetaPathFinder):
     """Load a package when it is imported, if Pyodide or the site knows it.
@@ -44,13 +49,20 @@ class LazyPackages(importlib.abc.MetaPathFinder):
     for the rest: imports inside functions, and of dependencies.
     """
 
-    def __init__(self, knows, load):
+    def __init__(self, knows, load, blocking):
         self._knows = knows
         self._load = load
+        self._blocking = blocking
         self._busy = set()
 
     def find_spec(self, fullname, path=None, target=None):
         if "." in fullname or fullname in self._busy or not self._knows(fullname):
+            return None
+        if not self._blocking:
+            print(
+                f"Could not load {fullname} when it was imported: {NO_BLOCKING}",
+                file=sys.stderr,
+            )
             return None
         from pyodide.ffi import run_sync
 
@@ -78,13 +90,22 @@ class ReportErrors(logging.Handler):
         print(f"ERROR: {record.name}: {record.getMessage()}", file=sys.stderr)
 
 
-def setup(knows, load):
-    """Once per interpreter. ``knows(name)`` and ``load(name)`` are of the page."""
+def setup(knows, load, blocking=True):
+    """Once per interpreter. ``knows(name)`` and ``load(name)`` are of the page.
+
+    ``blocking`` is whether ``pyodide.ffi.run_sync`` can be used here. Where it
+    cannot (it is a fatal error in Safari), the blocking API of wgpu says so
+    with an exception, which the example may survive.
+    """
+    if not blocking:
+        import pyodide.ffi
+
+        pyodide.ffi.can_run_sync = lambda: False
     for path in (STORE, IMAGE_STORE, IMAGES, EXAMPLES + "/data", "/tmp/pygfx"):
         os.makedirs(path, exist_ok=True)
     os.environ["PYGFX_DATA_DIR"] = "/tmp/pygfx"  # pygfx does not know this platform
     os.environ["IMAGEIO_USERDIR"] = "/imageio"  # where the page puts the sample images
-    sys.meta_path.append(LazyPackages(knows, load))
+    sys.meta_path.append(LazyPackages(knows, load, blocking))
     logging.getLogger().addHandler(ReportErrors(level=logging.ERROR))
 
     import wgpudawn
@@ -138,6 +159,35 @@ def _place(wanted, placed, store, target):
         os.rename(f"{store}/{entry}", f"{target}/{entry}")
     placed.clear()
     placed.update(wanted)
+
+
+async def warm():
+    """Have the GPU device before the example asks for it.
+
+    An example asks with the blocking API, which in a browser means a switch
+    of the WebAssembly stack (JSPI). Awaiting it here needs none, so that an
+    example which only draws runs in a browser where blocking does not work.
+    Not for an example that configures the device itself.
+    """
+    import wgpudawn
+    from wgpudawn.utils.device import helper
+
+    if helper._the_device is not None:
+        return
+    try:
+        # As DefaultDeviceHelper.get_default_device does, but awaiting
+        adapter = helper._adapter_kwargs.pop("adapter", None)
+        if adapter is None:
+            adapter = await wgpudawn.gpu.request_adapter_async(**helper._adapter_kwargs)
+        kwargs = helper._device_kwargs.copy()
+        required = kwargs.get("required_features", set())
+        extra = kwargs.pop("preferred_features", set()) & adapter.features
+        kwargs["required_features"] = required | extra
+        helper._the_device = await adapter.request_device_async(**kwargs)
+        helper._adapter_kwargs.clear()
+        helper._device_kwargs.clear()
+    except Exception as err:  # the example will ask, and report
+        print(f"Could not get the GPU device ahead: {err}", file=sys.stderr)
 
 
 def run(example_id, data, images):

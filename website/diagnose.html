@@ -103,7 +103,7 @@ const TESTS = [
     const promising = typeof WebAssembly.promising === 'function';
     if (!suspending || !promising) {
       throw new Error(`WebAssembly.Suspending: ${suspending}, WebAssembly.promising: ${promising}. ` +
-        'Without JSPI, Python cannot wait for the browser: the blocking API (most examples) cannot work.');
+        'Without JSPI, Python cannot wait for the browser: the blocking API (reading back from the GPU, picking) cannot work.');
     }
     return 'WebAssembly.Suspending and WebAssembly.promising exist.';
   }],
@@ -138,6 +138,58 @@ const TESTS = [
     return 'can_run_sync() is True.';
   }],
 
+  ['wgpudawn imports', 'The Pyodide build of wgpudawn (cffi + Dawn\'s Emdawnwebgpu), from the bundle of the gallery', async () => {
+    if (!manifest) throw new Error('examples.json is not here: this page is not part of a built site.');
+    await state.py.loadPackage(['cffi'], { messageCallback: () => {} });
+    const data = new Uint8Array(await (await fetch(manifest.base.url)).arrayBuffer());
+    state.py.unpackArchive(data, 'zip', { extractDir: '/site' });
+    return `${manifest.base.url} (${(data.length / 1e6).toFixed(1)} MB)\n` + await python(
+      'import sys\nsys.path.insert(0, "/site/packages")\n' +
+      'import wgpudawn, wgpudawn.backends.dawn as dawn\nf"wgpudawn {wgpudawn.__version__}, Dawn {dawn.__version__}"');
+  }],
+
+  ['wgpudawn: adapter and device, awaited', 'request_adapter_async / request_device_async (no stack switching)', async () =>
+    await python(
+      'import wgpudawn\nadapter = await wgpudawn.gpu.request_adapter_async()\n' +
+      'device = await adapter.request_device_async()\nadapter.summary')],
+
+  ['wgpudawn computes on the GPU, awaited', 'A compute shader squares 16 numbers; the result is read back with await (no stack switching)', async () => {
+    await state.py.loadPackage(['numpy'], { messageCallback: () => {} });
+    return await python(`
+import numpy as np, wgpudawn
+shader = """
+@group(0) @binding(0) var<storage, read> a: array<f32>;
+@group(0) @binding(1) var<storage, read_write> b: array<f32>;
+@compute @workgroup_size(1)
+fn main(@builtin(global_invocation_id) i: vec3<u32>) { b[i.x] = a[i.x] * a[i.x]; }
+"""
+adapter = await wgpudawn.gpu.request_adapter_async()
+device = await adapter.request_device_async()
+a = np.arange(16, dtype=np.float32)
+buf_a = device.create_buffer_with_data(data=a, usage="STORAGE")
+buf_b = device.create_buffer(size=a.nbytes, usage="STORAGE|COPY_SRC")
+buf_r = device.create_buffer(size=a.nbytes, usage="MAP_READ|COPY_DST")
+module = device.create_shader_module(code=shader)
+pipeline = device.create_compute_pipeline(layout="auto", compute={"module": module, "entry_point": "main"})
+group = device.create_bind_group(layout=pipeline.get_bind_group_layout(0), entries=[
+    {"binding": 0, "resource": {"buffer": buf_a}},
+    {"binding": 1, "resource": {"buffer": buf_b}},
+])
+encoder = device.create_command_encoder()
+cpass = encoder.begin_compute_pass()
+cpass.set_pipeline(pipeline)
+cpass.set_bind_group(0, group)
+cpass.dispatch_workgroups(16)
+cpass.end()
+encoder.copy_buffer_to_buffer(buf_b, 0, buf_r, 0, a.nbytes)
+device.queue.submit([encoder.finish()])
+await buf_r.map_async("READ")
+b = np.frombuffer(buf_r.read_mapped(), dtype=np.float32)
+assert np.allclose(b, a * a), b
+"squares of 0..15: " + " ".join(str(int(x)) for x in b)
+`);
+  }],
+
   ['Python waits for the browser', 'pyodide.ffi.run_sync(asyncio.sleep(0.1)): the first stack switch', async () =>
     'run_sync(asyncio.sleep(0.1)) returned: ' + await python(
       'import asyncio\nfrom pyodide.ffi import run_sync\nrun_sync(asyncio.sleep(0.1))\n"ok"')],
@@ -152,29 +204,12 @@ const TESTS = [
       'import pyodide_js\nfrom pyodide.ffi import run_sync\nrun_sync(pyodide_js.loadPackage("sniffio"))\n' +
       'import sniffio\nsniffio.__version__')],
 
-  ['wgpudawn imports', 'The Pyodide wheel of wgpudawn (cffi + Dawn\'s Emdawnwebgpu)', async () => {
-    if (!manifest) throw new Error('examples.json is not here: this page is not part of a built site.');
-    await state.py.loadPackage(['cffi'], { messageCallback: () => {} });
-    const site = state.py.runPython('import site; site.getsitepackages()[0]');
-    const wheel = manifest.wheels.find((name) => name.startsWith('wgpudawn'));
-    const data = new Uint8Array(await (await fetch('wheels/' + encodeURIComponent(wheel))).arrayBuffer());
-    state.py.unpackArchive(data, 'wheel', { extractDir: site });
-    return wheel + '\n' + await python(
-      'import wgpudawn, wgpudawn.backends.dawn as dawn\nf"wgpudawn {wgpudawn.__version__}, Dawn {dawn.__version__}"');
-  }],
-
-  ['wgpudawn: adapter and device, awaited', 'request_adapter_async / request_device_async (no stack switching)', async () =>
-    await python(
-      'import wgpudawn\nadapter = await wgpudawn.gpu.request_adapter_async()\n' +
-      'device = await adapter.request_device_async()\nadapter.summary')],
-
   ['wgpudawn: adapter and device, blocking', 'request_adapter_sync / request_device_sync (through JSPI)', async () =>
     await python(
       'import wgpudawn\nadapter = wgpudawn.gpu.request_adapter_sync()\n' +
       'device = adapter.request_device_sync()\nadapter.summary')],
 
-  ['wgpudawn computes on the GPU', 'A compute shader squares 16 numbers; the result is read back', async () => {
-    await state.py.loadPackage(['numpy'], { messageCallback: () => {} });
+  ['wgpudawn computes on the GPU, blocking', 'The same, with the blocking API (through JSPI)', async () => {
     return await python(`
 import numpy as np, wgpudawn
 from wgpudawn.utils.compute import compute_with_buffers

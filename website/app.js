@@ -5,7 +5,7 @@
 // of index.html), and back and forward work.
 import * as runner from './runner.js';
 
-const { supportsWebGPU, supportsJSPI } = runner;
+const { supportsWebGPU, canBlock } = runner;
 const $ = (id) => document.getElementById(id);
 const SVG = 'http://www.w3.org/2000/svg';
 function h(tag, attrs, ...children) {
@@ -44,7 +44,7 @@ const examples = manifest.examples;
 const byId = new Map(examples.map((example, i) => [example.id, { example, index: i }]));
 const urlOf = (example) => `run.html?ex=${encodeURIComponent(example.id)}`;
 const webgpu = supportsWebGPU();
-const jspi = supportsJSPI();
+const jspi = canBlock();
 
 // ---------------------------------------------------------------- the views
 
@@ -472,7 +472,7 @@ function openExample(example, how) {
   (async () => {
     log(runner.describeBrowser(), 'out');
     if (!jspi) {
-      log('This browser has no JSPI (WebAssembly stack switching), which the blocking parts of the API need. Recent Chrome and Edge have it.', 'err');
+      log('In this browser Python cannot wait for the browser in the middle of a call (that takes JSPI, and Pyodide crashes on it in Safari). Examples that only draw run; reading back from the GPU, such as picking, raises an error. Recent Chrome and Edge have no such limit.', 'out');
     }
     try {
       const info = await runner.run(example, {
@@ -632,7 +632,7 @@ function buildGallery() {
   if (!webgpu) {
     $('browser').textContent = 'This browser does not have WebGPU, so the examples cannot run here: you are looking at screenshots. Recent versions of Chrome and Edge have it.';
   } else if (!jspi) {
-    $('browser').textContent = 'This browser has WebGPU, but not JSPI (WebAssembly stack switching), which the blocking parts of the API need: some examples will not run. Recent versions of Chrome and Edge have both.';
+    $('browser').textContent = 'This browser has WebGPU, but Python cannot wait for the browser in the middle of a call here (that takes JSPI, and Pyodide crashes on it in Safari). Examples that only draw run; those that read back from the GPU, such as picking, do not. Recent versions of Chrome and Edge run them all.';
   }
 
   // One example runs live in the hero: animated, good looking, and known to work.
