@@ -4,6 +4,6 @@
   "type": "module",
   "description": "Check the examples of the website in headless Chrome",
   "dependencies": {
-    "puppeteer-core": "^24.0.0"
+    "puppeteer-core": "^25.0.0"
   }
 }
