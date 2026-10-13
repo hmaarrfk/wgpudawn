@@ -26,6 +26,7 @@ const server = http.createServer((req, res) => {
     res.end(data);
   });
 }).listen(0, '127.0.0.1');
+await new Promise((resolve) => server.once('listening', resolve));
 
 const browser = await puppeteer.launch({
   executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome',

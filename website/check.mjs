@@ -45,6 +45,7 @@ const server = http.createServer((req, res) => {
     res.end(data);
   });
 }).listen(0, '127.0.0.1');
+await new Promise((resolve) => server.once('listening', resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
 
 const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'examples.json'), 'utf8'));
