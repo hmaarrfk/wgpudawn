@@ -154,6 +154,14 @@ Same session, continued.
   uses chunks of 16x16 or 8x8 pixels. The picture is identical, pixel for
   pixel, with both, also on a device made with the default limits (where the
   previous version fails). It is in the list of examples that must work.
+* `anisotropy_barn_lamp`: pygfx gives every texture map a uniform buffer of
+  its own, and this material reaches 13 in the fragment shader where WebGPU
+  guarantees 12. The example now asks for 13 and, where the GPU does not have
+  it, shows a text in the scene that says why. Dawn offers 12 on every GPU
+  tried, in Chrome too, so the site shows the text; wgpu-native draws the
+  lamp as before. The cause in pygfx is not fixed.
+* Issue 3 lists every example that does not work, or did not, with the commit
+  that fixed it.
 
 ## 2026-10-13 - Python starts with the gallery; the first release
 

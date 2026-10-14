@@ -1,5 +1,6 @@
 [
  "feature_demo/animation_mixer",
+ "feature_demo/anisotropy_barn_lamp",
  "feature_demo/aomap",
  "feature_demo/blending_ordered2",
  "feature_demo/blending_weighted_plus",
