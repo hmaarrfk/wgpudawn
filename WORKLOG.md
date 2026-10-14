@@ -34,6 +34,9 @@ in parentheses.
 
 **Giving the work**
 
+* When the cause is known and the fix is in scope, make the fix, not a
+  workaround with "say if you want the real fix": the human asked for larger
+  steps after the barn lamp got a graceful failure first. (2026-10-14)
 * State the goal and the constraints, not the steps: "standalone, co-installable,
   version from tags, wheels for these platforms, test by running pygfx's test
   suite" was enough to build the project. The constraints ("never ship a `wgpu`
@@ -160,6 +163,14 @@ Same session, continued.
   it, shows a text in the scene that says why. Dawn offers 12 on every GPU
   tried, in Chrome too, so the site shows the text; wgpu-native draws the
   lamp as before. The cause in pygfx is not fixed.
+* Then the cause, in one step (the human asked for larger steps): the mesh
+  shaders put the uv transforms of all texture maps of a material in one
+  uniform buffer, which the maps keep up to date. The lamp needs 6 uniform
+  buffers instead of 13 and draws on Dawn, pixel-identical to wgpu-native;
+  the limit request in the example is reverted. pygfx's tests pass on both
+  backends. On wgpu-native, 141 examples render identically before and
+  after, and the other 27 differ as much as two runs of the old code do. In
+  Chrome on a GPU, 197 of 200 work; the 3 left cannot work in a browser.
 * Issue 3 lists every example that does not work, or did not, with the commit
   that fixed it.
 
