@@ -158,8 +158,11 @@ def parse_example(path):
 
     # The size of the window that the example asks for (logical pixels): the
     # page gives the canvas that shape. 640x480 is the default of rendercanvas.
-    size = re.search(r"\bsize=\((\d+),\s*(\d+)\)", source)
-    width, height = (int(size.group(1)), int(size.group(2))) if size else (640, 480)
+    # Not that of an offscreen canvas, which an example may make besides.
+    sizes = list(re.finditer(r"^(.*)\bsize=\((\d+),\s*(\d+)\)", source, re.M))
+    shown = [m for m in sizes if "Offscreen" not in m.group(1)]
+    size = (shown or sizes or [None])[0]
+    width, height = (int(size.group(2)), int(size.group(3))) if size else (640, 480)
 
     for pattern, implied in IMPLIED_IMPORTS:
         if re.search(pattern, source):

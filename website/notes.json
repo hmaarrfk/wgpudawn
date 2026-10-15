@@ -1,6 +1,5 @@
 {
   "_comment": "Why an example that is run on the website does not work (yet). Shown next to the example. Keys are example ids; update-website maintains this.",
   "feature_demo/geometry_plane": "Plays a video (cockatoo.mp4), which needs PyAV to decode. PyAV (FFmpeg) has no build for Pyodide.",
-  "other/sponza_scene": "Needs the glTF-Sample-Assets repository (hundreds of MB) next to the examples; the site does not ship it.",
-  "validation/validate_view_offset": "Draws an offscreen canvas from inside the draw callback of the visible one and waits for the result. In a browser, a draw callback cannot block (no JSPI stack there), so the readback is not available."
+  "other/sponza_scene": "Needs the glTF-Sample-Assets repository (hundreds of MB) next to the examples; the site does not ship it."
 }

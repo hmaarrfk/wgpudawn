@@ -193,6 +193,7 @@
  "validation/validate_text_size",
  "validation/validate_tiny_image",
  "validation/validate_transform",
+ "validation/validate_view_offset",
  "validation/validate_volume",
  "validation/validate_volume_ray_cam_sign",
  "validation/validate_volume_slice"

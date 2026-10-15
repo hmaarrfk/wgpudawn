@@ -143,6 +143,27 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-15 - A draw callback that waits for the GPU
+
+Same session, continued.
+
+* `validation/validate_view_offset` draws an offscreen canvas four times from
+  inside the draw callback of the visible canvas, and each time reads the
+  picture back from the GPU. rendercanvas draws in an animation frame of the
+  browser, and Python called from there cannot wait (no stack that JSPI can
+  suspend). The page now calls the paint of rendercanvas through Pyodide's
+  `callPromising`, so a draw callback can use the blocking API of wgpu, as on
+  a desktop. The example itself is unchanged. It looks like pygfx's reference
+  screenshot. In Chrome on a GPU 198 of 200 examples work, and the other
+  examples behave as before. In a browser without JSPI (Safari on iOS) the
+  page paints as before.
+* The page sized the canvas of that example from the first `size=(...)` in
+  its source, which is the offscreen canvas's; it now skips offscreen
+  canvases. No other example's size changed.
+* Locally, headless Chrome 154 on SwiftShader loses the GPU device of every
+  example within half a second (`introductory/cube` too), so checks without
+  a GPU are only meaningful in CI.
+
 ## 2026-10-13 - 0.0.2, and an example that asks the GPU what it allows
 
 Same session, continued.

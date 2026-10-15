@@ -112,6 +112,8 @@ def setup(knows, load, blocking=True):
 
     wgpudawn.install_as_wgpu()  # pygfx and rendercanvas import wgpu by name
     _size_at_once()
+    if blocking:
+        _paint_can_block()
 
 
 def _size_at_once():
@@ -146,6 +148,29 @@ def _size_at_once():
         original(self)
 
     backend.PyodideRenderCanvas._final_canvas_init = _final_canvas_init
+
+
+def _paint_can_block():
+    """A draw callback can use the blocking API of wgpu, as on a desktop.
+
+    rendercanvas draws in an animation frame of the browser, which calls
+    Python without a stack that can be suspended (JSPI). So a draw that waits
+    for the GPU (reading back a texture, such as drawing an offscreen canvas,
+    or picking) fails there. ``callPromising`` gives the call such a stack.
+    """
+    from js import window
+    from pyodide.ffi import create_proxy
+    from rendercanvas import pyodide as backend
+
+    def _rc_request_paint(self):
+        paint = getattr(self, "_paint_promising", None)
+        if paint is None:
+            paint = create_proxy(self._time_to_paint).callPromising
+            self._paint_promising = paint
+            self._paint_frame = create_proxy(lambda _: paint())
+        window.requestAnimationFrame(self._paint_frame)
+
+    backend.PyodideRenderCanvas._rc_request_paint = _rc_request_paint
 
 
 def _place(wanted, placed, store, target):
