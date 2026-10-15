@@ -113,7 +113,9 @@ For each example that fails, find out why, in this order:
    image): fix `build.py` / `pyodide.json` / `runner.js`. A package from PyPI
    goes in `pypi_by_import`, pinned, with its requirements in `requires`; a
    module that an example imports indirectly in `IMPLIED_IMPORTS` in
-   `build.py`, so that it is loaded before the example runs.
+   `build.py`, so that it is loaded before the example runs. A glTF scene
+   that an example expects in a checkout next to it (glTF-Sample-Assets) goes
+   in `GLTF_SCENES`, pinned to a commit: the site serves only that scene.
 3. **wgpudawn is wrong**: reproduce it natively first, where validation errors
    are raised at the failing call (in the browser they arrive later and
    anonymous: "[Invalid RenderPipeline] is invalid due to a previous error"

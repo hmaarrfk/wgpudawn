@@ -143,6 +143,24 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-15 - Sponza, from the files of one scene
+
+Same session, continued.
+
+* `other/sponza_scene` looks for a checkout of the whole KhronosGroup/glTF-Sample-Assets
+  repository in a parent directory. The build now reads `Sponza.gltf` at a
+  pinned commit and downloads only the files it refers to (71 files, 52 MB),
+  served as one 48 MB data file. The page unpacks it at
+  `examples/glTF-Sample-Assets/Models/Sponza/glTF`, where the example finds
+  it; the example is unchanged. `GLTF_SCENES` in `build.py` lists such
+  scenes.
+* In Chrome on a GPU it draws in about 6 s. The picture is the same as that
+  of Dawn and of wgpu-native outside the browser, which are pixel-identical
+  to each other. A comparison at a different canvas size first looked like a
+  difference: some small white flowers show at 640x480 and not at the
+  page's 839x629, natively too. 199 of the 200 examples that can run in a
+  browser now work; the last one plays a video, which needs PyAV.
+
 ## 2026-10-15 - A draw callback that waits for the GPU
 
 Same session, continued.

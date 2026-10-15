@@ -144,6 +144,7 @@
  "other/hirez_screenshot",
  "other/image_histogram",
  "other/reactive_rendering",
+ "other/sponza_scene",
  "other/two_canvases",
  "validation/validate_alpha",
  "validation/validate_blend_additive",

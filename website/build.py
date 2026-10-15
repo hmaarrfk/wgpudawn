@@ -26,12 +26,14 @@ import hashlib
 import io
 import json
 import os
+import posixpath
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -39,6 +41,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 IMAGEIO_URL = "https://github.com/imageio/imageio-binaries/raw/master/images/"
+
+# Example -> a glTF scene of a repository that it expects as a checkout next to
+# the examples (in a parent directory of the example). The site serves only the
+# files of that scene, at that path: (repository, commit, path of the .gltf).
+GLTF_SCENES = {
+    "other/sponza_scene": (
+        "KhronosGroup/glTF-Sample-Assets",
+        "edc7c9e67c639d230715049ee31f9a96a6babbbe",
+        "Models/Sponza/glTF/Sponza.gltf",
+    ),
+}
 
 # The pages, as they are
 STATIC = (
@@ -328,6 +341,35 @@ def download(url, path):
             f.write(data)
         os.replace(path + ".part", path)
     return path
+
+
+def gltf_scene(repo, commit, path, cache_dir):
+    """The files of a glTF scene of a GitHub repository: the .gltf and what it uses.
+
+    Returns (data entry, local directory). The entry is the directory of the
+    scene in a checkout of the repository, e.g.
+    "glTF-Sample-Assets/Models/Sponza/glTF".
+    """
+    folder = posixpath.dirname(path)
+    base = f"https://raw.githubusercontent.com/{repo}/{commit}/{folder}/"
+    local = os.path.join(cache_dir, "github", repo, commit, *folder.split("/"))
+    gltf = download(
+        base + posixpath.basename(path), os.path.join(local, posixpath.basename(path))
+    )
+    with open(gltf, encoding="utf-8") as f:
+        doc = json.load(f)
+    uris = {
+        item["uri"]
+        for key in ("buffers", "images")
+        for item in doc.get(key, [])
+        if "uri" in item and not item["uri"].startswith("data:")
+    }
+    for uri in sorted(uris):
+        name = urllib.parse.unquote(uri)
+        if name.startswith("/") or ".." in name.split("/") or "://" in name:
+            raise SystemExit(f"{path}: refers to a file outside its directory: {uri}")
+        download(base + uri, os.path.join(local, *name.split("/")))
+    return repo.split("/")[1] + "/" + folder, local
 
 
 def pypi_wheel(spec, lock, cache_dir):
@@ -730,11 +772,19 @@ def main():
 
     # The data files (large), per file or directory of examples/data: an
     # example fetches what it names. With pygfx's reference screenshots.
+    # ... and the glTF scenes that examples expect in a checkout next to them
+    sources = {}
+    for example in examples:
+        if example["id"] in GLTF_SCENES:
+            entry, local = gltf_scene(*GLTF_SCENES[example["id"]], args.cache)
+            sources[entry] = local
+            example["data"].append(entry)
+            example["needs_data"] = True
     data = {}
     for entry in sorted({d for e in examples for d in e["data"]}):
         zf = Bundle()
         zf.add_tree(
-            os.path.join(examples_dir, entry),
+            sources.get(entry, os.path.join(examples_dir, entry)),
             entry,
             keep=lambda p: os.sep + "diffs" + os.sep not in p,
         )
