@@ -14,7 +14,7 @@
   },
   "pygfx": {
     "repository": "https://github.com/hmaarrfk/pygfx",
-    "commit": "4ae9dec92a9e9233ec2f495cb96fdc9974455c58",
+    "commit": "381942f5f1cc5e3eda765bb2be6b4e39dd29c92e",
     "upstream": "https://github.com/pygfx/pygfx",
     "branch": "webgpu-portability",
     "note": "The commit whose test suite CI runs on wgpudawn, and whose examples the website shows. For now a branch of a fork: pygfx main (5d6e2c8) plus fixes that are not offered upstream yet (issue 2). Go back to a commit of pygfx/pygfx when they are merged."

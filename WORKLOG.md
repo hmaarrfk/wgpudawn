@@ -143,6 +143,19 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-17 - light_view with an imgui panel
+
+Same session, continued.
+
+* `other/light_view` showed lights and materials, but its controls were a Qt
+  window, so it was listed as impossible in a browser. On the pygfx branch
+  of the site (`381942f`), its panel is now imgui, like `bloom` and
+  `gltf_viewer`, with the same controls (colour dialogs became imgui colour
+  editors). It runs on every rendercanvas backend. Not offered to pygfx yet.
+* In Chrome on a GPU it draws, and clicks on the panel take effect
+  (wireframe, auto rotate, a second light). 12 examples cannot run in a
+  browser now: Qt and wx windows, open3d, audio, psutil.
+
 ## 2026-10-16 - Video in the browser: PyAV and FFmpeg for Pyodide
 
 Same session, continued.
