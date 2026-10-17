@@ -3,7 +3,8 @@
     python website/build.py --pygfx ../pygfx-src --wheels <dir> --out site
 
 ``--wheels`` is a directory with the wheels that the pages install: wgpudawn
-for Pyodide, pygfx (pure Python) and freetype-py (``build_freetype.sh``).
+for Pyodide, pygfx (pure Python), freetype-py (``build_freetype.sh``) and
+PyAV with FFmpeg (``build_pyav.sh``, only for the examples that read video).
 The other packages are pinned in ``pyodide.json``: those of PyPI are
 downloaded here (into ``--cache``) and served by the site, so that a page
 asks PyPI nothing; those of the Pyodide distribution come from its CDN.
@@ -100,6 +101,8 @@ IMPLIED_IMPORTS = [
     (r"\bload_mesh(es)?\b|\bload_scene\b", ["trimesh"]),
     # ... a glTF file from the web
     (r"(?s)\bload_gltf.*https?://|https?://.*\bload_gltf", ["httpx"]),
+    # imageio reads and writes video with PyAV
+    (r"(?s)imageio.*\.(?:mp4|mkv|webm|avi|mov)\b", ["av"]),
 ]
 # Calls that configure the GPU device of the whole interpreter. An example
 # that makes one gets an interpreter of its own (see runner.js).
@@ -123,7 +126,6 @@ UNAVAILABLE = {
     "sounddevice": "Plays audio through PortAudio, which needs an audio device of the operating system.",
     "soundfile": "Reads audio with libsndfile, which has no build for Pyodide.",
     "psutil": "Reads the CPU usage of the machine with psutil. A browser tab has no access to that.",
-    "av": "Decodes video with PyAV (FFmpeg), which has no build for Pyodide.",
     "pytest": "This is a test, not an example.",
     "unittest": "This is a test, not an example.",
 }
@@ -268,6 +270,7 @@ def collect_examples(examples_dir, pyodide):
             info = parse_example(os.path.join(examples_dir, category, name))
             modules = info.pop("modules")
             source = info.pop("source")
+            built = [m for m in modules if m in pyodide["built_by_import"]]
             extras = sorted(m for m in modules if m in pypi_by_import)
             packages = {PYODIDE_PACKAGES[m] for m in modules if m in PYODIDE_PACKAGES}
             for module in extras:
@@ -283,7 +286,7 @@ def collect_examples(examples_dir, pyodide):
                     "animated": info["docs"].startswith("animate"),
                     "packages": sorted(packages),
                     # Modules whose wheels (of PyPI) the site serves: manifest.extras
-                    "extras": extras,
+                    "extras": sorted(extras + built),
                     "pypi": sorted(pypi_by_import[m] for m in extras),
                     "data": used_data(source, entries) if info["needs_data"] else [],
                     "imports_examples": sorted(modules & (local_modules - {name[:-3]})),
@@ -789,6 +792,21 @@ def main():
             ],
             # ... and what they need of the Pyodide distribution
             "packages": extra_requires(pyodide, module)[1],
+        }
+
+    # Packages that this project builds for Pyodide (website/build_<name>.sh),
+    # that only some examples import
+    for module, key in pyodide["built_by_import"].items():
+        if key not in wheels:
+            raise SystemExit(
+                f"No {key} wheel in {args.wheels} (website/build_{key}.sh)"
+            )
+        path = os.path.join(args.wheels, wheels[key])
+        check_requires([path], [*base_packages, "numpy"], f"the {key} wheel")
+        shutil.copy(path, os.path.join(out, "wheels", wheels[key]))
+        extras[module] = {
+            "wheels": [{"url": "wheels/" + wheels[key], "size": os.path.getsize(path)}],
+            "packages": [],
         }
 
     examples = collect_examples(examples_dir, pyodide)

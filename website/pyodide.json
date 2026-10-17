@@ -20,6 +20,9 @@
     "gltflib": "gltflib==1.0.13",
     "observ": "observ==1.0.1"
   },
+  "built_by_import": {
+    "av": "av"
+  },
   "requires": {
     "imgui-bundle": [
       "numpy"

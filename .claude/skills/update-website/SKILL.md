@@ -62,7 +62,7 @@ The site is also rebuilt, with the pinned inputs, by every push to `main`.
 git -C ../pygfx-src fetch -q origin <ref> && git -C ../pygfx-src checkout -q FETCH_HEAD
 rm -rf ../web-wheels && mkdir -p ../web-wheels      # empty: build.py takes one wheel per package, whichever sorts last
 pip wheel --no-deps -w ../web-wheels ../pygfx-src
-# wgpudawn and freetype-py for Pyodide, from the last green CI run on main
+# wgpudawn, freetype-py and PyAV for Pyodide, from the last green CI run on main
 run=$(gh run list --branch main --workflow CI --status success --limit 1 --json databaseId --jq '.[0].databaseId')
 gh run download $run -n dist-wheel-pyodide -D ../web-wheels
 gh run download $run -n web-wheels -D ../web-wheels
@@ -75,7 +75,7 @@ whose `Pyodide` job succeeded, `gh run list --branch main --workflow CI`.)
 Use the wgpudawn wheel of the commit you are on: if you changed `wgpudawn/` or
 the bindings, build it instead (`pyodide build --exports pyinit`, see the
 `pyodide` job in `.github/workflows/wheels.yml` for the environment; the same job
-shows how `website/build_freetype.sh` is run).
+shows how `website/build_freetype.sh` and `website/build_pyav.sh` are run).
 
 ## 2. Check every example
 
@@ -115,7 +115,11 @@ For each example that fails, find out why, in this order:
    module that an example imports indirectly in `IMPLIED_IMPORTS` in
    `build.py`, so that it is loaded before the example runs. A glTF scene
    that an example expects in a checkout next to it (glTF-Sample-Assets) goes
-   in `GLTF_SCENES`, pinned to a commit: the site serves only that scene.
+   in `GLTF_SCENES`, pinned to a commit: the site serves only that scene. A
+   package with C code that neither PyPI nor Pyodide has for Pyodide is
+   built by a `website/build_<name>.sh` in the `pyodide` job of CI, and named
+   in `built_by_import` in `pyodide.json` (PyAV with FFmpeg: `build_pyav.sh`;
+   its FFmpeg configuration says which codecs and formats there are).
 3. **wgpudawn is wrong**: reproduce it natively first, where validation errors
    are raised at the failing call (in the browser they arrive later and
    anonymous: "[Invalid RenderPipeline] is invalid due to a previous error"
@@ -182,8 +186,8 @@ supports that Pyodide) and the `python-version` of the `pyodide` job in
 Platforms section of `README.md`.
 A new Pyodide can mean a new Emscripten and platform tag
 (`pyemscripten_<year>_<n>_wasm32`): then also `PLATFORM_TAG` in
-`website/build_freetype.sh` (and its compiler flags: compare with
-`pyodide config list`), and the pinned wheels in `pyodide.json`
+`website/build_freetype.sh` (and its compiler flags, also those of
+`website/build_pyav.sh`: compare with `pyodide config list`), and the pinned wheels in `pyodide.json`
 (imgui-bundle and uharfbuzz must have a wheel for that tag on PyPI; if they do
 not, stay on the old Pyodide and report it). `tools/gen_emdawn_glue.py` must
 be run with the Emscripten of the target Pyodide, which the build does.

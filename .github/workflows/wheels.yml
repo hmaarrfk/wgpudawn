@@ -283,6 +283,11 @@ jobs:
         source ${PYODIDE_XBUILDENV_PATH}/${PYODIDE_VERSION}/emsdk/emsdk_env.sh
         pip install cmake ninja
         website/build_freetype.sh web-wheels
+    - name: Build PyAV with FFmpeg for Pyodide (for the website; imageio reads video with it)
+      run: |
+        source ${PYODIDE_XBUILDENV_PATH}/${PYODIDE_VERSION}/emsdk/emsdk_env.sh
+        pip install wheel
+        website/build_pyav.sh web-wheels
     - uses: actions/upload-artifact@v7
       with:
         name: web-wheels

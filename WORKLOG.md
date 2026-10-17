@@ -143,6 +143,31 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-16 - Video in the browser: PyAV and FFmpeg for Pyodide
+
+Same session, continued.
+
+* imageio reads video with PyAV, which binds FFmpeg; neither PyPI nor Pyodide
+  has them for Pyodide. (imageio's other video plugin runs an `ffmpeg`
+  program as a subprocess, which a browser cannot do.)
+  `website/build_pyav.sh` compiles FFmpeg 9.0.2 with the Emscripten of
+  Pyodide (LGPL; the decoders, demuxers and parsers of common formats,
+  encoders that need no external library) into one shared library, and builds
+  PyAV 19.0.1 with `pyodide build` against it. PyAV has about 40 extension
+  modules; they all load that one library (6.5 MB), found through rpath. The
+  wheel is 3 MB. CI builds it in the `pyodide` job, next to freetype-py.
+* Two details: FFmpeg has one object file in two of its libraries, so the
+  merge allows the duplicate; and Pyodide replaces only one `$ORIGIN` per
+  rpath entry, so each directory is its own entry.
+* In Pyodide in Node, imageio reads all 280 frames of `cockatoo.mp4` in
+  2.3 s, the first one identical to a native decode, and writes an MP4 that
+  it reads back.
+* The site serves the wheel to the examples that read video
+  (`built_by_import` in `pyodide.json`). `feature_demo/geometry_plane` and
+  `feature_demo/video_yuv` (which was listed as impossible in a browser) play
+  the video. In Chrome on a GPU, all 201 examples that can run in a browser
+  work; 13 cannot (Qt, wx, threads, sockets and the like).
+
 ## 2026-10-16 - All the images of image_histogram
 
 Same session, continued.

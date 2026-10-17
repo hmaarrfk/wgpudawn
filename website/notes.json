@@ -1,4 +1,3 @@
 {
-  "_comment": "Why an example that is run on the website does not work (yet). Shown next to the example. Keys are example ids; update-website maintains this.",
-  "feature_demo/geometry_plane": "Plays a video (cockatoo.mp4), which needs PyAV to decode. PyAV (FFmpeg) has no build for Pyodide."
+  "_comment": "Why an example that is run on the website does not work (yet). Shown next to the example. Keys are example ids; update-website maintains this."
 }
