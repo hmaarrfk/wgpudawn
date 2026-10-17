@@ -143,6 +143,19 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-16 - All the images of image_histogram
+
+Same session, continued.
+
+* `other/image_histogram` offers 11 sample images of imageio in a dropdown,
+  named at runtime (`f"imageio:{name}.png"`). The build only saw names written
+  out in full, so the site served 4 of them, and choosing e.g. "text" failed
+  to download. The build now combines the strings of such an example with
+  what follows the placeholder and keeps those that are sample images of
+  imageio (its list, in `build.py`). All 11 load in the browser, with their
+  histograms. Two examples no longer list a file that is not a sample image
+  (it was never served).
+
 ## 2026-10-15 - Sponza, from the files of one scene
 
 Same session, continued.

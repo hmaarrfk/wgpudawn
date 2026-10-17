@@ -41,6 +41,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 IMAGEIO_URL = "https://github.com/imageio/imageio-binaries/raw/master/images/"
+# The sample images of imageio (imageio.core.request.EXAMPLE_IMAGES, 2.38)
+IMAGEIO_SAMPLES = {
+    *"astronaut.png bacterial_colony.tif bricks.jpg calcium_imaging.tif".split(),
+    *"camera.png checkerboard.png chelsea.bsdf chelsea.png chelsea.zip".split(),
+    *"clock.png cockatoo.mp4 cockatoo_yuv420.mp4 coffee.png coins.png".split(),
+    *"horse.png hubble_deep_field.png immunohistochemistry.png".split(),
+    *"meadow_cube.jpg moon.png newtonscradle.gif page.png stent.npz".split(),
+    *"text.png wikkie.png wood.jpg".split(),
+}
 
 # Example -> a glTF scene of a repository that it expects as a checkout next to
 # the examples (in a parent directory of the example). The site serves only the
@@ -199,16 +208,30 @@ def parse_example(path):
             )
         ),
         "source": source,
-        # Sample images that imageio would download: the site has them
-        # Also names that are only combined with "imageio:" at runtime
-        "imageio": sorted(
-            set(re.findall(r"imageio:([\w.\-]+)", source))
-            | set(re.findall(r"""["']([\w\-]+\.(?:png|jpg|npz))["']""", source))
-        )
-        or ["*"]  # the name is made at runtime: what the other examples use
-        if "imageio:" in source
-        else [],
+        "imageio": imageio_names(source) if "imageio:" in source else [],
     }
+
+
+def imageio_names(source):
+    """The sample images of imageio that an example reads ("imageio:xxx").
+
+    Also names that are only combined with "imageio:" at runtime, e.g.
+    ``f"imageio:{name}.png"`` with ``name`` from a list of strings: every
+    string of the source, with what follows the placeholder, that is the name
+    of a sample image.
+    """
+    names = set(re.findall(r"imageio:([\w.\-]+)", source))
+    suffixes = set(re.findall(r"imageio:\{[^}]*\}([\w.\-]*)", source))
+    if suffixes or re.search(r"""imageio:["']\s*\+""", source):
+        suffixes.add("")
+        strings = {
+            node.value
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        names |= {s + x for s in strings for x in suffixes} & IMAGEIO_SAMPLES
+    # The name is made in a way not seen here: what the other examples use
+    return sorted(names) or ["*"]
 
 
 def data_entries(examples_dir):
