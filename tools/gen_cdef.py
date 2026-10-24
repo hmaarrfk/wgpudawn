@@ -101,11 +101,11 @@ NATIVE_EXTRA_FUNCTIONS = [
     "wgpuSharedFenceRelease",
 ]
 NATIVE_EXTRA_ENUM_MEMBERS = [  # of enums that the shared cdef has
-    "WGPUFeatureName_SharedTextureMemoryIOSurface",
-    "WGPUFeatureName_SharedTextureMemoryDmaBuf",
-    "WGPUFeatureName_SharedFenceMTLSharedEvent",
-    "WGPUFeatureName_SharedFenceSyncFD",
-    "WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD",
+]
+# Enums of the shared cdef of which every native-only member is added: all of
+# Dawn's features, so that adapters and devices list them in ``features``.
+NATIVE_EXTRA_ALL_MEMBERS_OF = [
+    "WGPUFeatureName",
 ]
 
 
@@ -146,7 +146,13 @@ def make_native_extra_cdef(native_header, shared_header, cc="cc"):
     for name in NATIVE_EXTRA_FUNCTIONS:
         m = _find(r"^[^\n]*\b%s\([^\n]*\)\s*;" % name, text, name)
         lines.append(" ".join(m.group(0).split()))
-    for member in NATIVE_EXTRA_ENUM_MEMBERS:
+    members = list(NATIVE_EXTRA_ENUM_MEMBERS)
+    for name in NATIVE_EXTRA_ALL_MEMBERS_OF:
+        m = _find(r"^typedef enum %s \{(.*?)^\} %s\s*;" % (name, name), text, name)
+        for member in re.findall(r"^\s*(%s_\w+) =" % name, m.group(1), re.M):
+            if not member.endswith("_Force32") and member not in members:
+                members.append(member)
+    for member in members:
         line = _enum_member_line(member, text, shared)
         if line:
             lines.append(line)
