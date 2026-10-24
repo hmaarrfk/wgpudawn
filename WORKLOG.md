@@ -157,6 +157,23 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-24 - Release 0.32.0.1: the Dawn extras
+
+Same session as the entry below (whole session, from 2026-10-13: 278.6 h
+wall clock, 10.5 h agent working, 84 human prompts, $126.01 at API list
+prices).
+
+Asked: "Let's release it as you see fit."
+
+* Commit `28402de`, CI 40101869649 green: every test job 221 to 227 passed,
+  with only the platform skips.
+* `build_cffi.py` had changed since 0.32.0.0 (the C++ layer on
+  `dawn/native`), so it went out as `0.32.0.1rc1` first (tag run
+  40106352422). PyPI's 8 hashes matched CI's, a clean venv found the Intel
+  GPU and 42 features, and pip found a wheel for each of the six native
+  platforms. The Windows wheels bundle the same two MSVC DLLs as 0.32.0.0.
+  Then `0.32.0.1` went out on the same commit (tag run 40106845681).
+
 ## 2026-10-24 - Dawn beyond WebGPU: the extras, one area at a time
 
 | | |
@@ -205,8 +222,8 @@ extras and Dawn offer beyond WebGPU, without waiting for review.
   filled read as zeros; it looked like the first image layout, but was the
   plain `mmap` (not coherent here); `gbm_bo_map` is.
 * CI: runs 40097892750, 40098506801 (Windows test fixes), 40099516204 (all
-  green, website 202 ok), 40100575603 (Windows sharing). Not released: the
-  owner decides; `claude "/release"` would publish 0.32.0.1.
+  green, website 202 ok), 40100575603 (Windows sharing). Released as
+  0.32.0.1, see the entry above.
 
 ## 2026-10-24 - Two goals: wgpu-py, and Dawn beyond WebGPU
 
