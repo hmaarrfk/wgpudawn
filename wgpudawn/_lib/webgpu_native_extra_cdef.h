@@ -66,6 +66,15 @@ typedef struct WGPUSharedTextureMemoryDmaBufDescriptor {
     WGPUSharedTextureMemoryDmaBufPlane const * planes;
 } WGPUSharedTextureMemoryDmaBufDescriptor ;
 static const int WGPUSType_SharedTextureMemoryDmaBufDescriptor = 0x0005001E;
+typedef struct WGPUSharedTextureMemoryOpaqueFDDescriptor {
+    WGPUChainedStruct chain;
+    void const * vkImageCreateInfo;
+    int memoryFD;
+    uint32_t memoryTypeIndex;
+    uint64_t allocationSize;
+    WGPUBool dedicatedAllocation;
+} WGPUSharedTextureMemoryOpaqueFDDescriptor ;
+static const int WGPUSType_SharedTextureMemoryOpaqueFDDescriptor = 0x0005001F;
 typedef struct WGPUSharedTextureMemoryProperties {
     WGPUChainedStruct * nextInChain;
     WGPUTextureUsage usage;

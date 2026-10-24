@@ -79,6 +79,7 @@ NATIVE_EXTRA_STRUCTS = [
     "WGPUSharedTextureMemoryIOSurfaceDescriptor",
     "WGPUSharedTextureMemoryDmaBufPlane",
     "WGPUSharedTextureMemoryDmaBufDescriptor",
+    "WGPUSharedTextureMemoryOpaqueFDDescriptor",
     "WGPUSharedTextureMemoryProperties",
     "WGPUSharedTextureMemoryBeginAccessDescriptor",
     "WGPUSharedTextureMemoryEndAccessState",

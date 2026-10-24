@@ -140,14 +140,16 @@ What there is:
 
 * **Shared texture memory and shared fences.**
   `import_shared_texture_memory()` makes a `GPUSharedTextureMemory` from
-  memory that another API or process owns (an IOSurface on macOS, a dmabuf on
-  Linux). `create_texture()` on it gives a texture to render into between
+  memory that another API or process owns (an IOSurface on macOS; a dmabuf,
+  or Vulkan memory exported as an opaque fd by another Vulkan program or by
+  CUDA, on Linux). `create_texture()` on it gives a texture to render into between
   `begin_access()` and `end_access()`. The `GPUSharedFence` objects that
   `end_access()` returns export what to wait for (an `MTLSharedEvent` and its
   value, a sync fd, or an opaque-fd semaphore); `import_shared_fence()` goes
   the other way. Features: `shared-texture-memory-i-o-surface`,
   `shared-texture-memory-dma-buf`, `shared-fence-m-t-l-shared-event`,
-  `shared-fence-sync-f-d`, `shared-fence-vk-semaphore-opaque-f-d`.
+  `shared-texture-memory-opaque-f-d`, `shared-fence-sync-f-d`,
+  `shared-fence-vk-semaphore-opaque-f-d`.
 
 * **wgpu-py's extras that Dawn has**, with wgpu-py's signatures:
   `multi_draw_indirect()`, `multi_draw_indexed_indirect()` and their
@@ -179,8 +181,7 @@ What there is:
   `host-mapped-pointer` (experimental; Vulkan except on AMD, Metal, D3D12).
 
 What Dawn has that could come next (Dawn's `dawn/webgpu.h` and
-`dawn/native/*Backend.h`): shared texture memory from Vulkan opaque fds,
-on Windows (D3D12 resources, D3D11 textures, DXGI shared handles), from EGL
+`dawn/native/*Backend.h`): shared texture memory on Windows (D3D12 resources, D3D11 textures, DXGI shared handles), from EGL
 images and Android hardware buffers; shared buffer memory (Windows);
 multi-planar formats (NV12, P010, ...) and external textures; the native
 `ID3D12Device`, `ID3D11Device` and `MTLDevice`; pixel local storage,

@@ -125,7 +125,13 @@ def _fence_type_name(value):
 
 
 def import_shared_texture_memory(
-    device, *, label="", io_surface=None, dma_buf=None, allow_storage_binding=False
+    device,
+    *,
+    label="",
+    io_surface=None,
+    dma_buf=None,
+    opaque_fd=None,
+    allow_storage_binding=False,
 ):
     """Import externally allocated memory as a :class:`GPUSharedTextureMemory`.
 
@@ -135,15 +141,23 @@ def import_shared_texture_memory(
         io_surface (int): macOS: the ``IOSurfaceRef``, as an integer.
         dma_buf (dict): Linux: ``{"size": (width, height), "drm_format": fourcc,
             "drm_modifier": modifier, "planes": [{"fd": fd, "offset": 0, "stride": bytes}, ...]}``.
+        opaque_fd (dict): Linux: memory of a Vulkan image exported as an opaque
+            fd (by another Vulkan device, or CUDA): ``{"fd": fd,
+            "vk_image_create_info": address, "memory_type_index": int,
+            "allocation_size": int, "dedicated_allocation": bool}``, where the
+            address is that of the ``VkImageCreateInfo`` of the image (with a
+            ``VkExternalMemoryImageCreateInfo`` for opaque fds chained, and
+            ``VK_IMAGE_USAGE_TRANSFER_DST_BIT`` in its usage): Dawn makes the
+            same image on the memory. Feature ``shared-texture-memory-opaque-f-d``.
         allow_storage_binding (bool): IOSurface only: allow the ``STORAGE_BINDING``
             usage (writing from compute shaders), if the surface's format permits it.
 
-    Exactly one of ``io_surface`` and ``dma_buf`` must be given. The memory keeps
-    a reference to the handle (an IOSurface is retained; a dmabuf's fds are
-    duplicated), so the caller's can be released afterwards.
+    Exactly one of ``io_surface``, ``dma_buf`` and ``opaque_fd`` must be given.
+    The memory keeps a reference to the handle (an IOSurface is retained; the
+    fds are duplicated), so the caller's can be released afterwards.
     """
-    if (io_surface is None) == (dma_buf is None):
-        raise TypeError("Give exactly one of io_surface and dma_buf")
+    if sum(x is not None for x in (io_surface, dma_buf, opaque_fd)) != 1:
+        raise TypeError("Give exactly one of io_surface, dma_buf and opaque_fd")
     if io_surface is not None:
         chained = new_struct_p(
             "WGPUSharedTextureMemoryIOSurfaceDescriptor *",
@@ -151,6 +165,18 @@ def import_shared_texture_memory(
             allowStorageBinding=bool(allow_storage_binding),
         )
         chained.chain.sType = lib.WGPUSType_SharedTextureMemoryIOSurfaceDescriptor
+    elif opaque_fd is not None:
+        chained = new_struct_p(
+            "WGPUSharedTextureMemoryOpaqueFDDescriptor *",
+            vkImageCreateInfo=ffi.cast(
+                "void *", int(opaque_fd["vk_image_create_info"])
+            ),
+            memoryFD=int(opaque_fd["fd"]),
+            memoryTypeIndex=int(opaque_fd["memory_type_index"]),
+            allocationSize=int(opaque_fd["allocation_size"]),
+            dedicatedAllocation=bool(opaque_fd.get("dedicated_allocation", False)),
+        )
+        chained.chain.sType = lib.WGPUSType_SharedTextureMemoryOpaqueFDDescriptor
     else:
         planes = ffi.new(
             "WGPUSharedTextureMemoryDmaBufPlane[]", max(len(dma_buf["planes"]), 1)
@@ -182,7 +208,9 @@ def import_shared_texture_memory(
     id = _native("wgpuDeviceImportSharedTextureMemory")(device._internal, struct)
     if id == ffi.NULL:
         raise RuntimeError("wgpuDeviceImportSharedTextureMemory returned NULL")
-    return GPUSharedTextureMemory(label, id, device, vulkan=dma_buf is not None)
+    # Dawn's Vulkan backend tracks the image layout of each access
+    vulkan = dma_buf is not None or opaque_fd is not None
+    return GPUSharedTextureMemory(label, id, device, vulkan=vulkan)
 
 
 def import_shared_fence(
@@ -247,7 +275,7 @@ class SharedTextureMemoryEndAccessState:
     ``fences`` and ``signaled_values`` go together: the GPU work on the texture
     is done when each fence has reached its value. ``vk_image_layout`` is the
     ``(old_layout, new_layout)`` of the Vulkan image for memory imported as a
-    dmabuf, ``None`` otherwise.
+    dmabuf or an opaque fd (Vulkan), ``None`` otherwise.
     """
 
     initialized: bool
@@ -425,7 +453,7 @@ class GPUSharedTextureMemory(GPUObjectBase):
             fences (list of GPUSharedFence): Fences to wait for on the GPU before
                 the texture is used, with their ``signaled_values``.
             signaled_values (list of int): The value each fence must reach.
-            vk_image_layout (tuple): Memory imported as a dmabuf only: the
+            vk_image_layout (tuple): Memory imported as a dmabuf or opaque fd only: the
                 ``(old_layout, new_layout)`` of the Vulkan image, as ``VkImageLayout``
                 values. By default the layout that the last :meth:`end_access`
                 reported (``UNDEFINED`` at first) to ``GENERAL``.

@@ -382,3 +382,76 @@ if __name__ == "__main__":
     from testutils import run_tests
 
     run_tests(globals())
+
+
+# --- Linux: Vulkan memory exported as an opaque fd ---------------------------
+
+OPAQUE_FD_MEMORY = "shared-texture-memory-opaque-f-d"
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="opaque fds are Linux")
+def test_opaque_fd_round_trip():
+    # Another Vulkan device (on the same GPU) makes an image on exportable
+    # memory; Dawn imports it, renders into it, and Vulkan reads the pixels;
+    # then Vulkan writes, and Dawn reads.
+    if not can_use_wgpu_lib:
+        pytest.skip("Needs wgpu lib")
+    adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
+    if OPAQUE_FD_MEMORY not in adapter.features:
+        pytest.skip(f"Adapter lacks {OPAQUE_FD_MEMORY}")
+    # Ending an access exports a fence: one kind is needed (at most one on Vulkan)
+    fence_feature = next(
+        (f for f in (OPAQUE_FD, SYNC_FD) if f in adapter.features), None
+    )
+    if fence_feature is None:
+        pytest.skip("Adapter lacks a fence kind")
+    device = adapter.request_device_sync(
+        required_features=[OPAQUE_FD_MEMORY, fence_feature]
+    )
+    import vkutils
+
+    vk = vkutils.VulkanDevice(device, adapter)
+    try:
+        image = vk.create_exported_image(WIDTH, HEIGHT)
+    except RuntimeError as err:
+        vk.close()
+        pytest.skip(str(err))
+    try:
+        memory = extras.import_shared_texture_memory(
+            device,
+            opaque_fd={
+                "fd": image["fd"],
+                "vk_image_create_info": ctypes.addressof(image["_create_info"]),
+                "memory_type_index": image["memory_type_index"],
+                "allocation_size": image["size"],
+                "dedicated_allocation": True,
+            },
+        )
+        props = memory.properties
+        assert props["format"] == "rgba8unorm"
+        assert props["size"] == (WIDTH, HEIGHT, 1)
+        texture = memory.create_texture()
+
+        # Dawn writes, Vulkan reads
+        memory.begin_access(texture, initialized=False)
+        _clear_to(device, texture, (1.0, 0.0, 0.0, 1.0))
+        state = memory.end_access(texture)
+        assert state.initialized
+        assert state.vk_image_layout is not None
+        device.queue.on_submitted_work_done_sync()
+        assert (vk.pixels(image) == [255, 0, 0, 255]).all()
+
+        # Vulkan writes, Dawn reads
+        vk.fill(image, [0, 255, 0, 255])
+        memory.begin_access(texture, initialized=True)
+        data = device.queue.read_texture(
+            {"texture": texture}, {"bytes_per_row": WIDTH * 4}, (WIDTH, HEIGHT, 1)
+        )
+        memory.end_access(texture)
+        pixels = np.frombuffer(data, np.uint8).reshape(HEIGHT, WIDTH, 4)
+        assert (pixels == [0, 255, 0, 255]).all()
+        del texture, memory
+    finally:
+        device.queue.on_submitted_work_done_sync()
+        vk.release(image)
+        vk.close()
