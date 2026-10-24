@@ -2,6 +2,7 @@
 // Functions on Dawn's native C++ API, for wgpudawn.backends.dawn.extras.
 // Declared in dawn_native_cdef.h. Native builds only.
 
+#include <array>
 #include <cstring>
 
 // The Vulkan backend (built on Linux and Windows, see tools/build_dawn.py).
@@ -23,6 +24,31 @@ DAWN_NATIVE_EXPORT VkInstance GetInstance(WGPUDevice device);
 DAWN_NATIVE_EXPORT PFN_vkVoidFunction GetInstanceProcAddr(WGPUDevice device, const char* pName);
 }  // namespace dawn::native::vulkan
 #endif
+
+// dawn::native::vulkan::AdapterPropertiesVulkanUUIDs, declared the same way
+// (VulkanBackend.h needs the Vulkan headers), so that each compiler lays it
+// out as Dawn's: the arrays may be in the tail padding of the base (Itanium
+// ABI), which a C struct cannot express.
+struct WgpuDawnAdapterPropertiesVulkanUUIDs : wgpu::ChainedStructOut {
+  WgpuDawnAdapterPropertiesVulkanUUIDs() {
+    sType = static_cast<wgpu::SType>(WGPUSType_AdapterPropertiesVulkanUUIDs);
+  }
+  std::array<uint8_t, 16> deviceUUID = {};
+  std::array<uint8_t, 16> driverUUID = {};
+};
+
+static int wgpu_dawn_vulkan_uuids(WGPUAdapter adapter, uint8_t* out32) {
+  WgpuDawnAdapterPropertiesVulkanUUIDs uuids;
+  WGPUAdapterInfo info = WGPU_ADAPTER_INFO_INIT;
+  info.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&uuids);
+  if (wgpuAdapterGetInfo(adapter, &info) != WGPUStatus_Success) {
+    return 0;
+  }
+  wgpuAdapterInfoFreeMembers(info);
+  std::memcpy(out32, uuids.deviceUUID.data(), 16);
+  std::memcpy(out32 + 16, uuids.driverUUID.data(), 16);
+  return 1;
+}
 
 static dawn::native::InstanceBase* wgpu_dawn_instance_base(WGPUInstance instance) {
   return reinterpret_cast<dawn::native::InstanceBase*>(instance);

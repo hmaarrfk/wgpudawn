@@ -232,12 +232,14 @@ def test_io_surface_round_trip():
 
 
 class _GbmBuffer:
-    """A linear ARGB8888 dmabuf from GBM on the first render node."""
+    """A linear ARGB8888 dmabuf from GBM on the render node of the adapter
+    (a machine with several GPUs has several)."""
 
-    def __init__(self, width, height):
-        node = "/dev/dri/renderD128"
-        if not os.path.exists(node):
-            pytest.skip("No render node")
+    def __init__(self, adapter, width, height):
+        drm = extras.get_adapter_properties(adapter).get("drm") or {}
+        node = drm.get("render_node")
+        if not node:
+            pytest.skip("The adapter has no render node")
         for name in (
             "/usr/lib/x86_64-linux-gnu/libgbm.so.1",
             "/usr/lib64/libgbm.so.1",
@@ -318,7 +320,7 @@ def test_dma_buf_round_trip():
     device = adapter.request_device_sync(
         required_features=[DMA_BUF] + ([fence_feature] if fence_feature else [])
     )
-    buffer = _GbmBuffer(WIDTH, HEIGHT)
+    buffer = _GbmBuffer(adapter, WIDTH, HEIGHT)
 
     memory = extras.import_shared_texture_memory(
         device,

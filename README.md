@@ -164,17 +164,28 @@ What there is:
   on Vulkan, `get_vk_instance()` and `get_vk_instance_proc_addr()` let
   another library make Vulkan calls on Dawn's instance.
 
+* **What the backend says about the GPU.** `get_adapter_properties()`: the
+  Vulkan driver version and device/driver UUIDs (the UUID by which CUDA,
+  OpenGL or another Vulkan program finds the same GPU), the DRM primary and
+  render nodes on Linux (where to allocate a dmabuf, e.g. with GBM), the D3D
+  shader model and LUID on Windows, the memory heaps, the subgroup matrix
+  configurations. `get_format_capabilities()`: the DRM format modifiers with
+  which a format can be imported as a dmabuf.
+* **Buffers on host memory, without a copy.**
+  `create_buffer_from_host_memory()` makes a `GPUBuffer` whose memory is a
+  numpy array (or any writable buffer, aligned to
+  `get_host_memory_alignment()`; `allocate_host_memory()` makes such
+  memory): the GPU reads and writes it directly. Feature
+  `host-mapped-pointer` (experimental; Vulkan except on AMD, Metal, D3D12).
+
 What Dawn has that could come next (Dawn's `dawn/webgpu.h` and
-`dawn/native/*Backend.h`): shared texture memory on Windows (D3D12
-resources, D3D11 textures, DXGI shared handles), from EGL images, Android
-hardware buffers and Vulkan opaque fds; shared buffer memory (D3D12
-resources, host pointers); multi-planar formats (NV12, P010, ...) and
-external textures; the native objects of a device (`VkInstance`,
-`VkDevice`, `MTLDevice`, `ID3D12Device`) and wrapping or exporting native
-images; adapter properties of the backend (driver, memory heaps, DRM
-device); Dawn's toggles; subgroup matrices, pixel local storage,
-framebuffer fetch. They are added when somebody needs them, one at a time,
-each with a test against the real other API.
+`dawn/native/*Backend.h`): shared texture memory from Vulkan opaque fds,
+on Windows (D3D12 resources, D3D11 textures, DXGI shared handles), from EGL
+images and Android hardware buffers; shared buffer memory (Windows);
+multi-planar formats (NV12, P010, ...) and external textures; the native
+`ID3D12Device`, `ID3D11Device` and `MTLDevice`; pixel local storage,
+framebuffer fetch. They are added one at a time, each with a test against the
+real other API (the `dawn-extra` skill).
 
 ## Platforms
 

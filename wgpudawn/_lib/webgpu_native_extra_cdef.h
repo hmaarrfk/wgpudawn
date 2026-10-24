@@ -1,5 +1,14 @@
 typedef struct WGPUSharedTextureMemoryImpl* WGPUSharedTextureMemory;
 typedef struct WGPUSharedFenceImpl* WGPUSharedFence;
+typedef void (*WGPUCallback)(void * userdata) ;
+extern "Python" void _wgpu_dawn_native_WGPUCallback(void * userdata);
+typedef WGPUFlags WGPUHeapProperty;
+static const WGPUHeapProperty WGPUHeapProperty_None = 0x0000000000000000;
+static const WGPUHeapProperty WGPUHeapProperty_DeviceLocal = 0x0000000000000001;
+static const WGPUHeapProperty WGPUHeapProperty_HostVisible = 0x0000000000000002;
+static const WGPUHeapProperty WGPUHeapProperty_HostCoherent = 0x0000000000000004;
+static const WGPUHeapProperty WGPUHeapProperty_HostUncached = 0x0000000000000008;
+static const WGPUHeapProperty WGPUHeapProperty_HostCached = 0x0000000000000010;
 typedef enum WGPUSharedFenceType {
     WGPUSharedFenceType_VkSemaphoreOpaqueFD = 0x00000001,
     WGPUSharedFenceType_SyncFD = 0x00000002,
@@ -138,6 +147,63 @@ typedef struct WGPUDawnTogglesDescriptor {
     const char* const * disabledToggles;
 } WGPUDawnTogglesDescriptor ;
 static const int WGPUSType_DawnTogglesDescriptor = 0x0005000A;
+typedef struct WGPUAdapterPropertiesDrm {
+    WGPUChainedStruct chain;
+    WGPUBool hasPrimary;
+    WGPUBool hasRender;
+    uint64_t primaryMajor;
+    uint64_t primaryMinor;
+    uint64_t renderMajor;
+    uint64_t renderMinor;
+} WGPUAdapterPropertiesDrm ;
+static const int WGPUSType_AdapterPropertiesDrm = 0x00050051;
+typedef struct WGPUAdapterPropertiesVk {
+    WGPUChainedStruct chain;
+    uint32_t driverVersion;
+} WGPUAdapterPropertiesVk ;
+static const int WGPUSType_AdapterPropertiesVk = 0x00050015;
+typedef struct WGPUAdapterPropertiesD3D {
+    WGPUChainedStruct chain;
+    uint32_t shaderModel;
+    uint32_t adapterLUIDLowPart;
+    uint32_t adapterLUIDHighPart;
+} WGPUAdapterPropertiesD3D ;
+static const int WGPUSType_AdapterPropertiesD3D = 0x00050014;
+typedef struct WGPUMemoryHeapInfo {
+    WGPUHeapProperty properties;
+    uint64_t size;
+} WGPUMemoryHeapInfo ;
+typedef struct WGPUAdapterPropertiesMemoryHeaps {
+    WGPUChainedStruct chain;
+    size_t heapCount;
+    WGPUMemoryHeapInfo const * heapInfo;
+} WGPUAdapterPropertiesMemoryHeaps ;
+static const int WGPUSType_AdapterPropertiesMemoryHeaps = 0x00050013;
+typedef struct WGPUDawnFormatCapabilities {
+    WGPUChainedStruct * nextInChain;
+} WGPUDawnFormatCapabilities ;
+typedef struct WGPUDawnDrmFormatProperties {
+    uint64_t modifier;
+    uint32_t modifierPlaneCount;
+} WGPUDawnDrmFormatProperties ;
+typedef struct WGPUDawnDrmFormatCapabilities {
+    WGPUChainedStruct chain;
+    size_t propertiesCount;
+    WGPUDawnDrmFormatProperties const * properties;
+} WGPUDawnDrmFormatCapabilities ;
+static const int WGPUSType_DawnDrmFormatCapabilities = 0x00050018;
+typedef struct WGPUBufferHostMappedPointer {
+    WGPUChainedStruct chain;
+    void * pointer;
+    WGPUCallback disposeCallback;
+    void * userdata;
+} WGPUBufferHostMappedPointer ;
+static const int WGPUSType_BufferHostMappedPointer = 0x00050012;
+typedef struct WGPUDawnHostMappedPointerLimits {
+    WGPUChainedStruct chain;
+    uint32_t hostMappedPointerAlignment;
+} WGPUDawnHostMappedPointerLimits ;
+static const int WGPUSType_DawnHostMappedPointerLimits = 0x00050043;
 WGPUSharedTextureMemory wgpuDeviceImportSharedTextureMemory(WGPUDevice device, WGPUSharedTextureMemoryDescriptor const * descriptor) ;
 WGPUSharedFence wgpuDeviceImportSharedFence(WGPUDevice device, WGPUSharedFenceDescriptor const * descriptor) ;
 WGPUStatus wgpuSharedTextureMemoryGetProperties(WGPUSharedTextureMemory sharedTextureMemory, WGPUSharedTextureMemoryProperties * properties) ;
@@ -151,6 +217,11 @@ void wgpuSharedTextureMemoryRelease(WGPUSharedTextureMemory sharedTextureMemory)
 void wgpuSharedFenceExportInfo(WGPUSharedFence sharedFence, WGPUSharedFenceExportInfo * info) ;
 void wgpuSharedFenceAddRef(WGPUSharedFence sharedFence) ;
 void wgpuSharedFenceRelease(WGPUSharedFence sharedFence) ;
+void wgpuAdapterPropertiesMemoryHeapsFreeMembers(WGPUAdapterPropertiesMemoryHeaps adapterPropertiesMemoryHeaps) ;
+WGPUStatus wgpuAdapterGetFormatCapabilities(WGPUAdapter adapter, WGPUTextureFormat format, WGPUDawnFormatCapabilities * capabilities) ;
+void wgpuDawnDrmFormatCapabilitiesFreeMembers(WGPUDawnDrmFormatCapabilities dawnDrmFormatCapabilities) ;
+void wgpuDeviceTick(WGPUDevice device) ;
+static const int WGPUSType_AdapterPropertiesVulkanUUIDs = 0x00050056;
 static const int WGPUFeatureName_DawnInternalUsages = 0x00050000;
 static const int WGPUFeatureName_DawnMultiPlanarFormats = 0x00050001;
 static const int WGPUFeatureName_DawnNative = 0x00050002;

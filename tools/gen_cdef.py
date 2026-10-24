@@ -58,6 +58,14 @@ NATIVE_EXTRA_HANDLES = [  # typedef struct XImpl* X;
     "WGPUSharedTextureMemory",
     "WGPUSharedFence",
 ]
+# Callback types: the typedef, and one extern "Python" function of that type,
+# _wgpu_dawn_native_<name> (extras.py defines it)
+NATIVE_EXTRA_CALLBACKS = [
+    "WGPUCallback",
+]
+NATIVE_EXTRA_FLAGS = [  # typedef WGPUFlags X; and its constants
+    "WGPUHeapProperty",
+]
 NATIVE_EXTRA_ENUMS = [
     "WGPUSharedFenceType",
 ]
@@ -85,6 +93,16 @@ NATIVE_EXTRA_STRUCTS = [
     "WGPUSharedFenceVkSemaphoreOpaqueFDDescriptor",
     "WGPUSharedFenceVkSemaphoreOpaqueFDExportInfo",
     "WGPUDawnTogglesDescriptor",
+    "WGPUAdapterPropertiesDrm",
+    "WGPUAdapterPropertiesVk",
+    "WGPUAdapterPropertiesD3D",
+    "WGPUMemoryHeapInfo",
+    "WGPUAdapterPropertiesMemoryHeaps",
+    "WGPUDawnFormatCapabilities",
+    "WGPUDawnDrmFormatProperties",
+    "WGPUDawnDrmFormatCapabilities",
+    "WGPUBufferHostMappedPointer",
+    "WGPUDawnHostMappedPointerLimits",
 ]
 NATIVE_EXTRA_FUNCTIONS = [
     "wgpuDeviceImportSharedTextureMemory",
@@ -100,8 +118,14 @@ NATIVE_EXTRA_FUNCTIONS = [
     "wgpuSharedFenceExportInfo",
     "wgpuSharedFenceAddRef",
     "wgpuSharedFenceRelease",
+    "wgpuAdapterPropertiesMemoryHeapsFreeMembers",
+    "wgpuAdapterGetFormatCapabilities",
+    "wgpuDawnDrmFormatCapabilitiesFreeMembers",
+    "wgpuDeviceTick",
 ]
 NATIVE_EXTRA_ENUM_MEMBERS = [  # of enums that the shared cdef has
+    # Its struct is in dawn/native/VulkanBackend.h (see dawn_native_cdef.h)
+    "WGPUSType_AdapterPropertiesVulkanUUIDs",
 ]
 # Enums of the shared cdef of which every native-only member is added: all of
 # Dawn's features, so that adapters and devices list them in ``features``.
@@ -132,6 +156,19 @@ def make_native_extra_cdef(native_header, shared_header, cc="cc"):
     lines = []
     for name in NATIVE_EXTRA_HANDLES:
         lines.append(f"typedef struct {name}Impl* {name};")
+    for name in NATIVE_EXTRA_CALLBACKS:
+        m = _find(r"^typedef void \(\*%s\)\((.*?)\)\s*;" % name, text, name)
+        lines.append(" ".join(m.group(0).split()))
+        lines.append(f'extern "Python" void _wgpu_dawn_native_{name}({m.group(1)});')
+    for name in NATIVE_EXTRA_FLAGS:
+        _find(r"^typedef WGPUFlags %s;" % name, text, name)
+        lines.append(f"typedef WGPUFlags {name};")
+        for member, value in re.findall(
+            r"^static const %s (%s_\w+) = (0x[0-9A-Fa-f]+|\d+);" % (name, name),
+            text,
+            re.M,
+        ):
+            lines.append(f"static const {name} {member} = {value};")
     for name in NATIVE_EXTRA_ENUMS:
         m = _find(r"^typedef enum %s \{.*?^\} %s\s*;" % (name, name), text, name)
         lines.append(m.group(0))

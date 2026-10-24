@@ -7,6 +7,7 @@ that use it run in a subprocess.
 """
 
 import ctypes
+import os
 import subprocess
 import sys
 import textwrap
@@ -24,8 +25,13 @@ pytestmark = pytest.mark.skipif(not can_use_wgpu_lib, reason="Needs wgpu lib")
 def run_in_subprocess(code):
     """Run code in a new interpreter; it prints SKIP <reason> or OK."""
     preamble = "import wgpudawn as wgpu\nfrom wgpudawn.backends.dawn import extras\n"
+    first, _, rest = code.partition("\n")
+    if not first.strip():  # code that starts with a newline is indented
+        code = textwrap.dedent(rest)
+    else:  # a line of setup, then the indented code
+        code = first + "\n" + textwrap.dedent(rest)
     result = subprocess.run(
-        [sys.executable, "-c", preamble + textwrap.dedent(code)],
+        [sys.executable, "-c", preamble + code],
         capture_output=True,
         text=True,
         timeout=120,
@@ -79,14 +85,17 @@ def test_set_instance_extras_after_the_instance_exists():
 
 
 def test_set_instance_extras():
-    run_in_subprocess("""
+    # The backend of the default adapter (in a subprocess, before the instance)
+    backend = wgpu.gpu.request_adapter_sync().info["backend_type"]
+    run_in_subprocess(
+        f"backend = {backend!r}\n"
+        + """
         try:
             extras.set_instance_extras(gles3_minor_version="Version2")
         except ValueError:
             pass
         else:
             raise AssertionError("expected a ValueError")
-        backend = "Metal" if __import__("sys").platform == "darwin" else "Vulkan"
         extras.set_instance_extras(
             backends=[backend],
             enable_toggles=["allow_unsafe_apis", "dump_shaders"],
@@ -106,7 +115,8 @@ def test_set_instance_extras():
         device = extras.request_device_sync(adapter, disable_toggles=["dump_shaders"])
         assert "dump_shaders" not in extras.get_toggles(device)
         print("OK")
-    """)
+    """
+    )
 
 
 def test_memory_usage():
@@ -249,3 +259,173 @@ WRITE_TIMESTAMP = """
 
 def test_write_timestamp():
     run_in_subprocess(WRITE_TIMESTAMP)
+
+
+# %% Adapter properties and format capabilities
+
+
+def test_adapter_properties():
+    adapter = wgpu.gpu.request_adapter_sync()
+    properties = extras.get_adapter_properties(adapter)
+    features = adapter.features
+    assert ("vk" in properties) == ("adapter-properties-vk" in features)
+    assert ("d3d" in properties) == ("adapter-properties-d3d" in features)
+    if "adapter-properties-memory-heaps" in features:
+        heaps = properties["memory_heaps"]
+        assert heaps and all(h["size"] > 0 for h in heaps)
+        assert any("device-local" in h["properties"] for h in heaps)
+    if "d3d" in properties:
+        assert properties["d3d"]["shader_model"] >= 50
+        assert properties["d3d"]["luid"] != 0
+    drm = properties.get("drm")
+    if drm and drm["render"]:
+        rdev = os.stat(drm["render_node"]).st_rdev
+        assert (os.major(rdev), os.minor(rdev)) == drm["render"]
+
+
+def test_vulkan_uuid_is_that_of_a_vulkan_device():
+    # The device UUID of the adapter is the one Vulkan reports for the GPU
+    # (which is how CUDA, OpenGL or another Vulkan program finds the same GPU)
+    adapter = wgpu.gpu.request_adapter_sync()
+    if adapter.info["backend_type"] != "Vulkan":
+        pytest.skip("Not a Vulkan adapter")
+    uuid = extras.get_adapter_properties(adapter)["vulkan_uuids"]["device_uuid"]
+    assert len(uuid) == 16 and any(uuid)
+    device = adapter.request_device_sync()
+    instance = extras.get_vk_instance(device)
+
+    def vk(name, restype, *argtypes):
+        address = extras.get_vk_instance_proc_addr(device, name)
+        assert address, name
+        return ctypes.CFUNCTYPE(restype, *argtypes)(address)
+
+    enumerate_devices = vk(
+        "vkEnumeratePhysicalDevices",
+        ctypes.c_int32,
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_uint32),
+        ctypes.POINTER(ctypes.c_void_p),
+    )
+    get_properties2 = vk(
+        "vkGetPhysicalDeviceProperties2", None, ctypes.c_void_p, ctypes.c_void_p
+    )
+
+    class IDProperties(ctypes.Structure):
+        _fields_ = [
+            ("sType", ctypes.c_int32),
+            ("pNext", ctypes.c_void_p),
+            ("deviceUUID", ctypes.c_uint8 * 16),
+            ("driverUUID", ctypes.c_uint8 * 16),
+            ("deviceLUID", ctypes.c_uint8 * 8),
+            ("deviceNodeMask", ctypes.c_uint32),
+            ("deviceLUIDValid", ctypes.c_uint32),
+        ]
+
+    class Properties2(ctypes.Structure):
+        _fields_ = [
+            ("sType", ctypes.c_int32),
+            ("pNext", ctypes.c_void_p),
+            ("properties", ctypes.c_uint8 * 2048),  # VkPhysicalDeviceProperties
+        ]
+
+    count = ctypes.c_uint32(0)
+    assert enumerate_devices(instance, ctypes.byref(count), None) == 0
+    physical = (ctypes.c_void_p * count.value)()
+    assert enumerate_devices(instance, ctypes.byref(count), physical) == 0
+    uuids = []
+    for handle in physical:
+        ids = IDProperties(sType=1000071004)  # PHYSICAL_DEVICE_ID_PROPERTIES
+        props = Properties2(sType=1000059001, pNext=ctypes.addressof(ids))
+        get_properties2(handle, ctypes.byref(props))
+        uuids.append(bytes(ids.deviceUUID))
+    assert uuid in uuids
+
+
+def test_format_capabilities():
+    adapter = wgpu.gpu.request_adapter_sync()
+    with pytest.raises(KeyError):
+        extras.get_format_capabilities(adapter, "not-a-format")
+    if "dawn-drm-format-capabilities" not in adapter.features:
+        with pytest.raises(RuntimeError):
+            extras.get_format_capabilities(adapter, "bgra8unorm")
+        pytest.skip("Adapter lacks dawn-drm-format-capabilities")
+    modifiers = extras.get_format_capabilities(adapter, "bgra8unorm")["drm_modifiers"]
+    assert modifiers and all(m["plane_count"] >= 1 for m in modifiers)
+    assert any(m["modifier"] == 0 for m in modifiers)  # DRM_FORMAT_MOD_LINEAR
+
+
+# %% Host memory
+
+
+HOST_MEMORY = """
+    import gc
+    import numpy as np
+    from wgpudawn.backends.dawn._ffi import callbacks
+
+    extras.set_instance_extras(enable_toggles=["allow_unsafe_apis"])
+    adapter = wgpu.gpu.request_adapter_sync()
+    if "host-mapped-pointer" not in adapter.features:
+        print("SKIP adapter lacks host-mapped-pointer")
+        raise SystemExit
+    device = adapter.request_device_sync(required_features=["host-mapped-pointer"])
+    alignment = extras.get_host_memory_alignment(device)
+    assert alignment > 0 and alignment & (alignment - 1) == 0
+
+    memory = extras.allocate_host_memory(device, 1000)
+    assert memory.nbytes % alignment == 0 and not memory.readonly
+    try:
+        extras.create_buffer_from_host_memory(device, memory[1:], usage="STORAGE")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected a ValueError for unaligned memory")
+
+    # The GPU works on the memory itself: a compute shader doubles the array
+    array = np.frombuffer(memory, np.float32)
+    array[:] = np.arange(array.size)
+    pending = len(callbacks._callbacks)
+    buffer = extras.create_buffer_from_host_memory(device, array, usage="STORAGE")
+    assert buffer.size == memory.nbytes
+    shader = device.create_shader_module(code='''
+        @group(0) @binding(0) var<storage, read_write> x: array<f32>;
+        @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) i: vec3u) {
+            if (i.x < arrayLength(&x)) { x[i.x] = x[i.x] * 2.0; }
+        }
+    ''')
+    pipeline = device.create_compute_pipeline(
+        layout="auto", compute={"module": shader, "entry_point": "main"})
+    bind_group = device.create_bind_group(
+        layout=pipeline.get_bind_group_layout(0),
+        entries=[{"binding": 0, "resource": {"buffer": buffer}}])
+    encoder = device.create_command_encoder()
+    cpass = encoder.begin_compute_pass()
+    cpass.set_pipeline(pipeline)
+    cpass.set_bind_group(0, bind_group)
+    cpass.dispatch_workgroups(array.size // 64 + 1)
+    cpass.end()
+    device.queue.submit([encoder.finish()])
+    device.queue.on_submitted_work_done_sync()
+    assert np.array_equal(array, np.arange(array.size) * 2), array[:8]
+
+    # Dawn lets go of the memory after the buffer is destroyed and later work
+    # is done, when it processes events
+    assert len(callbacks._callbacks) == pending + 1
+    buffer.destroy()
+    del buffer, bind_group
+    gc.collect()
+    other = device.create_buffer(size=256, usage="COPY_DST")
+    for i in range(5):
+        encoder = device.create_command_encoder()
+        encoder.clear_buffer(other)
+        device.queue.submit([encoder.finish()])
+        device.queue.on_submitted_work_done_sync()
+        extras.process_events()
+        if len(callbacks._callbacks) == pending:
+            break
+    assert len(callbacks._callbacks) == pending, "the memory was not released"
+    print("OK")
+"""
+
+
+def test_host_memory():
+    run_in_subprocess(HOST_MEMORY)

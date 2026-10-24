@@ -14,3 +14,6 @@ void wgpu_dawn_perform_idle_tasks(WGPUDevice device);
 // Vulkan backend (zero/NULL on a build or device without it)
 void * wgpu_dawn_vk_instance(WGPUDevice device);
 void * wgpu_dawn_vk_get_instance_proc_addr(WGPUDevice device, const char * name);
+// The device and driver UUIDs of a Vulkan adapter (16 bytes each, into out32);
+// returns 0 when Dawn does not give them.
+int wgpu_dawn_vulkan_uuids(WGPUAdapter adapter, uint8_t * out32);

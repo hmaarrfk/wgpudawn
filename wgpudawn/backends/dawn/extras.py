@@ -64,6 +64,13 @@ from ._extras_device import (
     request_device_sync,
     set_instance_extras,
 )
+from ._extras_adapter import get_adapter_properties, get_format_capabilities
+from ._extras_memory import (
+    allocate_host_memory,
+    create_buffer_from_host_memory,
+    get_host_memory_alignment,
+    process_events,
+)
 from ._extras_draw import (
     multi_draw_indexed_indirect,
     multi_draw_indexed_indirect_count,
@@ -77,7 +84,12 @@ __all__ = [
     "GPUSharedTextureMemory",
     "SharedTextureMemoryEndAccessState",
     "all_toggles",
+    "allocate_host_memory",
+    "create_buffer_from_host_memory",
     "feature_info",
+    "get_adapter_properties",
+    "get_format_capabilities",
+    "get_host_memory_alignment",
     "get_memory_usage",
     "get_toggles",
     "get_vk_instance",
@@ -89,6 +101,7 @@ __all__ = [
     "multi_draw_indirect",
     "multi_draw_indirect_count",
     "perform_idle_tasks",
+    "process_events",
     "reduce_memory_usage",
     "request_device",
     "request_device_sync",
@@ -111,7 +124,9 @@ def _fence_type_name(value):
     return hex(value)
 
 
-def import_shared_texture_memory(device, *, label="", io_surface=None, dma_buf=None):
+def import_shared_texture_memory(
+    device, *, label="", io_surface=None, dma_buf=None, allow_storage_binding=False
+):
     """Import externally allocated memory as a :class:`GPUSharedTextureMemory`.
 
     Arguments:
@@ -120,6 +135,8 @@ def import_shared_texture_memory(device, *, label="", io_surface=None, dma_buf=N
         io_surface (int): macOS: the ``IOSurfaceRef``, as an integer.
         dma_buf (dict): Linux: ``{"size": (width, height), "drm_format": fourcc,
             "drm_modifier": modifier, "planes": [{"fd": fd, "offset": 0, "stride": bytes}, ...]}``.
+        allow_storage_binding (bool): IOSurface only: allow the ``STORAGE_BINDING``
+            usage (writing from compute shaders), if the surface's format permits it.
 
     Exactly one of ``io_surface`` and ``dma_buf`` must be given. The memory keeps
     a reference to the handle (an IOSurface is retained; a dmabuf's fds are
@@ -131,7 +148,7 @@ def import_shared_texture_memory(device, *, label="", io_surface=None, dma_buf=N
         chained = new_struct_p(
             "WGPUSharedTextureMemoryIOSurfaceDescriptor *",
             ioSurface=ffi.cast("void *", int(io_surface)),
-            allowStorageBinding=False,
+            allowStorageBinding=bool(allow_storage_binding),
         )
         chained.chain.sType = lib.WGPUSType_SharedTextureMemoryIOSurfaceDescriptor
     else:
