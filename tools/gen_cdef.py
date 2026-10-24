@@ -84,6 +84,7 @@ NATIVE_EXTRA_STRUCTS = [
     "WGPUSharedFenceSyncFDExportInfo",
     "WGPUSharedFenceVkSemaphoreOpaqueFDDescriptor",
     "WGPUSharedFenceVkSemaphoreOpaqueFDExportInfo",
+    "WGPUDawnTogglesDescriptor",
 ]
 NATIVE_EXTRA_FUNCTIONS = [
     "wgpuDeviceImportSharedTextureMemory",

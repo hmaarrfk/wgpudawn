@@ -68,9 +68,10 @@ Differences with wgpu-py:
 
 * Shaders are compiled by Tint, which follows the WGSL spec strictly; naga
   (wgpu-native) accepts some shaders that Tint rejects.
-* No wgpu-native extras (`wgpu.backends.wgpu_native.extras`: GLSL shaders,
-  pipeline statistics queries, multi-draw-indirect-count, ...), and no
-  wgpu-native specific features and limits. Dawn has its own non-standard
+* Of wgpu-native's extras (`wgpu.backends.wgpu_native.extras`), only what
+  Dawn can do (see [Beyond WebGPU](#beyond-webgpu-dawns-extras)): no GLSL
+  shaders, pipeline statistics queries or API traces, and no wgpu-native
+  specific features and limits. Dawn has its own non-standard
   features, e.g. `unorm16-texture-formats`.
 * Dawn's own extras: see [Beyond WebGPU](#beyond-webgpu-dawns-extras).
 * Devices always have the `core-features-and-limits` feature.
@@ -148,10 +149,23 @@ What there is:
   `shared-texture-memory-dma-buf`, `shared-fence-m-t-l-shared-event`,
   `shared-fence-sync-f-d`, `shared-fence-vk-semaphore-opaque-f-d`.
 
+* **wgpu-py's extras that Dawn has**, with wgpu-py's signatures:
+  `multi_draw_indirect()`, `multi_draw_indexed_indirect()` and their
+  `_count` variants, `write_timestamp()`, `set_instance_extras()` (the
+  backends, validation layers and DXC; and Dawn's toggles) and
+  `request_device_sync()` (with Dawn's device toggles; Dawn cannot write a
+  trace). Dawn calls some of its features experimental (`feature_info()`
+  says which, e.g. `multi-draw-indirect`): they need
+  `set_instance_extras(enable_toggles=["allow_unsafe_apis"])`.
+* **Toggles, memory and the native instance.** `all_toggles()` lists Dawn's
+  toggles (workarounds, debugging aids such as `dump_shaders`,
+  `skip_validation`), `get_toggles()` says which an adapter or device has;
+  `get_memory_usage()`, `reduce_memory_usage()`, `perform_idle_tasks()`;
+  on Vulkan, `get_vk_instance()` and `get_vk_instance_proc_addr()` let
+  another library make Vulkan calls on Dawn's instance.
+
 What Dawn has that could come next (Dawn's `dawn/webgpu.h` and
-`dawn/native/*Backend.h`): wgpu-py's own extras that Dawn can do too
-(`multi_draw_indirect()` and its variants, `write_timestamp()`; the backend
-already has them, they lack the public functions); shared texture memory on Windows (D3D12
+`dawn/native/*Backend.h`): shared texture memory on Windows (D3D12
 resources, D3D11 textures, DXGI shared handles), from EGL images, Android
 hardware buffers and Vulkan opaque fds; shared buffer memory (D3D12
 resources, host pointers); multi-planar formats (NV12, P010, ...) and

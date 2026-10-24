@@ -68,8 +68,10 @@ if not is_emscripten():
     cdef += open(os.path.join(SRC, "webgpu_native_extra_cdef.h")).read()
     cdef += (
         "\nsize_t wgpu_dawn_enumerate_adapters(WGPUInstance instance,"
+        " const WGPURequestAdapterOptions * options,"
         " WGPUAdapter * adapters, size_t max_count);\n"
     )
+    cdef += open(os.path.join(SRC, "dawn_native_cdef.h")).read()
 
 # Native: true adapter enumeration. webgpu.h has no way to enumerate adapters
 # (wgpuInstanceRequestAdapter only returns the "best" one, so e.g. lavapipe is
@@ -81,22 +83,24 @@ NATIVE_PREAMBLE = """
 static int wgpu_dawn_install(const char* code) { (void)code; return 0; }
 
 // Get all adapters of the instance (all backends). Fills up to max_count
-// adapters (each with a new reference), and returns the total count.
+// adapters (each with a new reference), and returns the total count. The
+// options may be NULL; adapter toggles can be chained to them.
 static size_t wgpu_dawn_enumerate_adapters(
-    WGPUInstance instance, WGPUAdapter* adapters, size_t max_count) {
+    WGPUInstance instance, const WGPURequestAdapterOptions* options,
+    WGPUAdapter* adapters, size_t max_count) {
   // A WGPUInstance is a dawn::native::InstanceBase*. The wrapper adds a ref
   // and releases it again when it goes out of scope.
   dawn::native::Instance wrapper(
       reinterpret_cast<dawn::native::InstanceBase*>(instance));
   std::vector<dawn::native::Adapter> found =
-      wrapper.EnumerateAdapters(static_cast<const WGPURequestAdapterOptions*>(nullptr));
+      wrapper.EnumerateAdapters(options);
   for (size_t i = 0; i < found.size() && i < max_count; i++) {
     adapters[i] = found[i].Get();
     wgpuAdapterAddRef(adapters[i]);
   }
   return found.size();
 }
-"""
+""" + open(os.path.join(SRC, "dawn_native.cpp")).read()
 
 ffibuilder = FFI()
 ffibuilder.cdef(cdef)

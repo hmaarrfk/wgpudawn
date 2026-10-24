@@ -50,32 +50,51 @@ from ._api import (
     new_struct_p,
     to_c_string_view,
 )
+from ._extras_util import _native, _check_status
+from ._extras_device import (
+    all_toggles,
+    feature_info,
+    get_memory_usage,
+    get_toggles,
+    get_vk_instance,
+    get_vk_instance_proc_addr,
+    perform_idle_tasks,
+    reduce_memory_usage,
+    request_device,
+    request_device_sync,
+    set_instance_extras,
+)
+from ._extras_draw import (
+    multi_draw_indexed_indirect,
+    multi_draw_indexed_indirect_count,
+    multi_draw_indirect,
+    multi_draw_indirect_count,
+    write_timestamp,
+)
 
 __all__ = [
     "GPUSharedFence",
     "GPUSharedTextureMemory",
     "SharedTextureMemoryEndAccessState",
+    "all_toggles",
+    "feature_info",
+    "get_memory_usage",
+    "get_toggles",
+    "get_vk_instance",
+    "get_vk_instance_proc_addr",
     "import_shared_fence",
     "import_shared_texture_memory",
+    "multi_draw_indexed_indirect",
+    "multi_draw_indexed_indirect_count",
+    "multi_draw_indirect",
+    "multi_draw_indirect_count",
+    "perform_idle_tasks",
+    "reduce_memory_usage",
+    "request_device",
+    "request_device_sync",
+    "set_instance_extras",
+    "write_timestamp",
 ]
-
-
-def _native(name):
-    """A function of the native build, or a clear error on a build without it."""
-    function = getattr(libf, name, None)
-    if function is None:
-        raise RuntimeError(
-            f"{name} is not available in this build of wgpudawn "
-            "(Dawn's native extras need a native build)"
-        )
-    return function
-
-
-def _check_status(status, what):
-    # Dawn reports the reason through the device's error callback, which libf
-    # raises; this is for a failure that produced no error.
-    if status != lib.WGPUStatus_Success:
-        raise RuntimeError(f"{what} failed (status {status})")
 
 
 _fence_types = {

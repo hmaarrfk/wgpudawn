@@ -35,6 +35,8 @@ from ... import classes, flags, enums, structs
 from ._ffi import ffi, lib, IS_WEB, CALLBACK_MODE, callbacks, c_callback
 from ._mappings import cstructfield2enum, enummap, enum_str2int, enum_int2str
 from ._helpers import (
+    dawn_instance_extras,
+    new_toggles_struct,
     get_wgpu_instance,
     get_surface_id_from_info,
     get_memoryview_from_address,
@@ -427,6 +429,9 @@ _WHOLE_SIZE = lib.WGPU_WHOLE_SIZE
 # Native only, see dawn_bindings/build_cffi.py
 _enumerate_adapters = getattr(lib, "wgpu_dawn_enumerate_adapters", None)
 
+# The backends, in the order in which Dawn prefers them
+_backend_order = ["Vulkan", "Metal", "D3D12", "D3D11", "OpenGL", "OpenGLES"]
+
 
 def find_surface_id_from_canvas(canvas_or_context):
     """Try to get the surface_id from a RenderCanvas, rendercanvas context, or GPUCanvasContect."""
@@ -496,6 +501,16 @@ class GPU(classes.GPU):
                 )
             else:
                 logger.warning(f"Forcing backend: {force_backend} ({backend})")
+        elif dawn_instance_extras["backends"] is not None:
+            # set_instance_extras(backends=...): the first of those that
+            # has an adapter, in the order in which Dawn prefers them
+            for name in _backend_order:
+                if name in dawn_instance_extras["backends"] and any(
+                    a.info["backend_type"] == name
+                    for a in self._enumerate_all_adapters()
+                ):
+                    backend = enum_str2int["BackendType"][name]
+                    break
 
         return self._request_adapter(
             feature_level, power_preference, force_fallback_adapter, surface_id, backend
@@ -516,10 +531,18 @@ class GPU(classes.GPU):
             "compatibility": lib.WGPUFeatureLevel_Compatibility,
         }[feature_level]
 
+        # Dawn's adapter toggles (set_instance_extras), native only
+        keepalive = []
+        c_toggles = _NULL
+        if not IS_WEB:
+            c_toggles = new_toggles_struct(
+                *dawn_instance_extras["adapter_toggles"], keepalive
+            )
+
         # H: nextInChain: WGPUChainedStruct *, featureLevel: WGPUFeatureLevel, powerPreference: WGPUPowerPreference, forceFallbackAdapter: WGPUBool/int, backendType: WGPUBackendType, compatibleSurface: WGPUSurface
         struct = new_struct_p(
             "WGPURequestAdapterOptions *",
-            # not used: nextInChain
+            nextInChain=c_toggles,
             featureLevel=c_feature_level,
             powerPreference=power_preference or "high-performance",
             forceFallbackAdapter=bool(force_fallback_adapter),
@@ -550,7 +573,9 @@ class GPU(classes.GPU):
             return self._create_adapter(adapter_id)
 
         promise = GPUPromise(
-            "request_adapter", handler, keepalive=request_adapter_callback
+            "request_adapter",
+            handler,
+            keepalive=(request_adapter_callback, struct, keepalive),
         )
 
         instance = get_wgpu_instance()
@@ -579,12 +604,13 @@ class GPU(classes.GPU):
 
         adapters = []
         if _enumerate_adapters is not None:
-            # Use Dawn's native adapter enumeration (compiled into wgpudawn._lib)
-            instance = get_wgpu_instance()
-            count = _enumerate_adapters(instance, _NULL, 0)
-            c_adapters = ffi.new("WGPUAdapter[]", count)
-            count = min(count, _enumerate_adapters(instance, c_adapters, count))
-            adapters = [self._create_adapter(c_adapters[i]) for i in range(count)]
+            adapters = self._enumerate_all_adapters()
+            if dawn_instance_extras["backends"] is not None:
+                adapters = [
+                    a
+                    for a in adapters
+                    if a.info["backend_type"] in dawn_instance_extras["backends"]
+                ]
         else:  # Fallback, should not happen natively
             for pref in ("high-performance", "low-power"):
                 try:
@@ -593,7 +619,7 @@ class GPU(classes.GPU):
                     pass
 
         # Remove duplicates and Dawn's "Null" backend, and sort by backend type
-        backend_order = ["Vulkan", "Metal", "D3D12", "D3D11", "OpenGL", "OpenGLES"]
+        backend_order = _backend_order
         unique_adapters = {}
         for adapter in adapters:
             info = adapter.info
@@ -614,6 +640,28 @@ class GPU(classes.GPU):
         promise = GPUPromise("enumerate_adapters", None)
         promise._wgpu_set_input(adapters)
         return promise
+
+    def _enumerate_all_adapters(self):
+        # Dawn's native adapter enumeration (compiled into wgpudawn._lib),
+        # with the adapter toggles of set_instance_extras.
+        instance = get_wgpu_instance()
+        keepalive = []
+        # H: nextInChain: WGPUChainedStruct *, featureLevel: WGPUFeatureLevel, powerPreference: WGPUPowerPreference, forceFallbackAdapter: WGPUBool/int, backendType: WGPUBackendType, compatibleSurface: WGPUSurface
+        options = new_struct_p(
+            "WGPURequestAdapterOptions *",
+            nextInChain=new_toggles_struct(
+                *dawn_instance_extras["adapter_toggles"], keepalive
+            ),
+            # not used: featureLevel
+            # not used: powerPreference
+            # not used: forceFallbackAdapter
+            # not used: backendType
+            # not used: compatibleSurface
+        )
+        count = _enumerate_adapters(instance, options, _NULL, 0)
+        c_adapters = ffi.new("WGPUAdapter[]", count)
+        count = min(count, _enumerate_adapters(instance, options, c_adapters, count))
+        return [self._create_adapter(c_adapters[i]) for i in range(count)]
 
     def _create_adapter(self, adapter_id):
         # ----- Get adapter info
@@ -1233,8 +1281,11 @@ class GPUAdapter(classes.GPUAdapter):
         required_limits: dict[str, int],
         default_queue: structs.QueueDescriptorStruct,
         trace_path: str,
+        toggles=None,
     ) -> GPUPromise[GPUDevice]:
-        # Note that this method is used in extras.py
+        # Note that this method is used in extras.py. The toggles are Dawn's
+        # device toggles as (enabled, disabled) names, native only; by default
+        # those of set_instance_extras.
 
         # ---- Handle features
 
@@ -1396,10 +1447,17 @@ class GPUAdapter(classes.GPUAdapter):
 
         # ----- Request device
 
+        keepalive = []
+        c_toggles = _NULL
+        if not IS_WEB:
+            if toggles is None:
+                toggles = dawn_instance_extras["device_toggles"]
+            c_toggles = new_toggles_struct(*toggles, keepalive)
+
         # H: nextInChain: WGPUChainedStruct *, label: WGPUStringView, requiredFeatureCount: int, requiredFeatures: WGPUFeatureName *, requiredLimits: WGPULimits *, defaultQueue: WGPUQueueDescriptor, deviceLostCallbackInfo: WGPUDeviceLostCallbackInfo, uncapturedErrorCallbackInfo: WGPUUncapturedErrorCallbackInfo
         struct = new_struct_p(
             "WGPUDeviceDescriptor *",
-            # not used: nextInChain
+            nextInChain=c_toggles,
             label=to_c_string_view(label),
             requiredFeatureCount=len(c_features),
             requiredFeatures=new_array("WGPUFeatureName[]", c_features),
@@ -1445,7 +1503,9 @@ class GPUAdapter(classes.GPUAdapter):
             return device
 
         promise = GPUPromise(
-            "request_device", handler, keepalive=request_device_callback
+            "request_device",
+            handler,
+            keepalive=(request_device_callback, struct, keepalive),
         )
 
         # H: WGPUFuture f(WGPUAdapter adapter, WGPUDeviceDescriptor const * descriptor, WGPURequestDeviceCallbackInfo callbackInfo)

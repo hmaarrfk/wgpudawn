@@ -130,6 +130,14 @@ typedef struct WGPUSharedFenceVkSemaphoreOpaqueFDExportInfo {
     int handle;
 } WGPUSharedFenceVkSemaphoreOpaqueFDExportInfo ;
 static const int WGPUSType_SharedFenceVkSemaphoreOpaqueFDExportInfo = 0x0005002B;
+typedef struct WGPUDawnTogglesDescriptor {
+    WGPUChainedStruct chain;
+    size_t enabledToggleCount;
+    const char* const * enabledToggles;
+    size_t disabledToggleCount;
+    const char* const * disabledToggles;
+} WGPUDawnTogglesDescriptor ;
+static const int WGPUSType_DawnTogglesDescriptor = 0x0005000A;
 WGPUSharedTextureMemory wgpuDeviceImportSharedTextureMemory(WGPUDevice device, WGPUSharedTextureMemoryDescriptor const * descriptor) ;
 WGPUSharedFence wgpuDeviceImportSharedFence(WGPUDevice device, WGPUSharedFenceDescriptor const * descriptor) ;
 WGPUStatus wgpuSharedTextureMemoryGetProperties(WGPUSharedTextureMemory sharedTextureMemory, WGPUSharedTextureMemoryProperties * properties) ;

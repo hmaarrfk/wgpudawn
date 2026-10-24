@@ -79,6 +79,35 @@ def get_memoryview_from_address(address, nbytes, format="B"):
 
 _the_instance = None
 
+# What wgpudawn.backends.dawn.extras.set_instance_extras() asked for (native
+# only): the backends that adapters may be of (None: all), and the Dawn
+# toggles that every adapter and device gets, as (enabled, disabled) names.
+dawn_instance_extras = {
+    "backends": None,
+    "adapter_toggles": ((), ()),
+    "device_toggles": ((), ()),
+}
+
+
+def new_toggles_struct(enabled, disabled, keepalive):
+    """A ``WGPUDawnTogglesDescriptor *`` to chain to a descriptor, or NULL when
+    there are no toggles. The C strings are appended to ``keepalive``."""
+    if not enabled and not disabled:
+        return ffi.NULL
+    c_enabled = [ffi.new("char[]", name.encode()) for name in enabled]
+    c_disabled = [ffi.new("char[]", name.encode()) for name in disabled]
+    c_enabled_array = ffi.new("const char *[]", c_enabled or [ffi.NULL])
+    c_disabled_array = ffi.new("const char *[]", c_disabled or [ffi.NULL])
+    keepalive += [c_enabled, c_disabled, c_enabled_array, c_disabled_array]
+    struct = ffi.new("WGPUDawnTogglesDescriptor *")
+    struct.chain.sType = lib.WGPUSType_DawnTogglesDescriptor
+    struct.enabledToggleCount = len(enabled)
+    struct.enabledToggles = c_enabled_array
+    struct.disabledToggleCount = len(disabled)
+    struct.disabledToggles = c_disabled_array
+    keepalive.append(struct)
+    return ffi.cast("WGPUChainedStruct *", struct)
+
 
 def get_wgpu_instance(extras=None):
     """Get the global wgpu instance."""

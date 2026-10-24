@@ -24,7 +24,7 @@
 * Validated 39 classes, 123 methods, 52 properties
 ### Patching API for backends/dawn/_api.py
 * Diffs for GPUDevice: add pop_error_scope_async, add push_error_scope
-* Validated 39 classes, 113 methods, 0 properties
+* Validated 39 classes, 114 methods, 0 properties
 * Found 0 methods not implemented
 ## Validating backends/dawn/_api.py
 * Enum PipelineErrorReason missing in Dawn's webgpu.h
@@ -34,4 +34,4 @@
 * Wrote 268 enum mappings and 48 struct-field mappings to dawn/_mappings.py
 * Validated 148 C function calls
 * Not using 67 C functions
-* Validated 86 C structs
+* Validated 87 C structs
