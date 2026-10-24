@@ -370,6 +370,11 @@ enum_str2int = {
         "unorm16-texture-formats": 327692,
         "multi-draw-indirect": 327729,
         "chromium-experimental-subgroup-matrix": 327732,
+        "shared-texture-memory-i-o-surface": 327716,
+        "shared-texture-memory-dma-buf": 327711,
+        "shared-fence-m-t-l-shared-event": 327722,
+        "shared-fence-sync-f-d": 327719,
+        "shared-fence-vk-semaphore-opaque-f-d": 327718,
     },
 }
 

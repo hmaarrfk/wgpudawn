@@ -46,14 +46,82 @@ def make_cdef(header, cc="cc"):
     return "\n".join(lines) + "\n"
 
 
-# Native-only declarations that wgpu.backends.dawn uses (window-system surfaces).
+# Native-only declarations that wgpudawn.backends.dawn uses, in dependency
+# order: the window-system surface sources (_helpers.py), and Dawn's shared
+# texture memory and shared fences (extras.py). None of it exists in
+# Emdawnwebgpu's header, so it is compiled into native builds only
+# (build_cffi.py). A chained struct brings its WGPUSType member and the
+# feature names their WGPUFeatureName member as ``static const int`` with the
+# value of the header: cffi checks that value against the real header at build
+# time, and codegen reads it (codegen/hparser.py).
+NATIVE_EXTRA_HANDLES = [  # typedef struct XImpl* X;
+    "WGPUSharedTextureMemory",
+    "WGPUSharedFence",
+]
+NATIVE_EXTRA_ENUMS = [
+    "WGPUSharedFenceType",
+]
 NATIVE_EXTRA_STRUCTS = [
     "WGPUSurfaceSourceXlibWindow",
     "WGPUSurfaceSourceWaylandSurface",
     "WGPUSurfaceSourceXCBWindow",
     "WGPUSurfaceSourceMetalLayer",
     "WGPUSurfaceSourceWindowsHWND",
+    "WGPUSharedTextureMemoryDescriptor",
+    "WGPUSharedTextureMemoryIOSurfaceDescriptor",
+    "WGPUSharedTextureMemoryDmaBufPlane",
+    "WGPUSharedTextureMemoryDmaBufDescriptor",
+    "WGPUSharedTextureMemoryProperties",
+    "WGPUSharedTextureMemoryBeginAccessDescriptor",
+    "WGPUSharedTextureMemoryEndAccessState",
+    "WGPUSharedTextureMemoryVkImageLayoutBeginState",
+    "WGPUSharedTextureMemoryVkImageLayoutEndState",
+    "WGPUSharedFenceDescriptor",
+    "WGPUSharedFenceExportInfo",
+    "WGPUSharedFenceMTLSharedEventDescriptor",
+    "WGPUSharedFenceMTLSharedEventExportInfo",
+    "WGPUSharedFenceSyncFDDescriptor",
+    "WGPUSharedFenceSyncFDExportInfo",
+    "WGPUSharedFenceVkSemaphoreOpaqueFDDescriptor",
+    "WGPUSharedFenceVkSemaphoreOpaqueFDExportInfo",
 ]
+NATIVE_EXTRA_FUNCTIONS = [
+    "wgpuDeviceImportSharedTextureMemory",
+    "wgpuDeviceImportSharedFence",
+    "wgpuSharedTextureMemoryGetProperties",
+    "wgpuSharedTextureMemoryCreateTexture",
+    "wgpuSharedTextureMemoryBeginAccess",
+    "wgpuSharedTextureMemoryEndAccess",
+    "wgpuSharedTextureMemoryEndAccessStateFreeMembers",
+    "wgpuSharedTextureMemoryIsDeviceLost",
+    "wgpuSharedTextureMemoryAddRef",
+    "wgpuSharedTextureMemoryRelease",
+    "wgpuSharedFenceExportInfo",
+    "wgpuSharedFenceAddRef",
+    "wgpuSharedFenceRelease",
+]
+NATIVE_EXTRA_ENUM_MEMBERS = [  # of enums that the shared cdef has
+    "WGPUFeatureName_SharedTextureMemoryIOSurface",
+    "WGPUFeatureName_SharedTextureMemoryDmaBuf",
+    "WGPUFeatureName_SharedFenceMTLSharedEvent",
+    "WGPUFeatureName_SharedFenceSyncFD",
+    "WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD",
+]
+
+
+def _find(pattern, text, what):
+    m = re.search(pattern, text, re.M | re.S)
+    if m is None:
+        raise ValueError(f"{what} not found in the native header")
+    return m
+
+
+def _enum_member_line(member, native, shared):
+    """``static const int MEMBER = value;`` unless the shared cdef has it."""
+    if re.search(r"\b%s\b" % member, shared):
+        return None
+    value = _find(r"^\s*%s = (0x[0-9A-Fa-f]+|\d+)," % member, native, member).group(1)
+    return f"static const int {member} = {value};"
 
 
 def make_native_extra_cdef(native_header, shared_header, cc="cc"):
@@ -61,16 +129,27 @@ def make_native_extra_cdef(native_header, shared_header, cc="cc"):
     text = make_cdef(native_header, cc)
     shared = make_cdef(shared_header, cc)
     lines = []
-    for name in NATIVE_EXTRA_STRUCTS:
-        m = re.search(
-            r"^typedef struct %s \{.*?^\} %s\s*;" % (name, name), text, re.M | re.S
-        )
+    for name in NATIVE_EXTRA_HANDLES:
+        lines.append(f"typedef struct {name}Impl* {name};")
+    for name in NATIVE_EXTRA_ENUMS:
+        m = _find(r"^typedef enum %s \{.*?^\} %s\s*;" % (name, name), text, name)
         lines.append(m.group(0))
-        # The sType must be a member of WGPUSType, which in the shared cdef
-        # only has the members of the Emdawnwebgpu header.
-        stype = f"WGPUSType_{name[len('WGPU') :]}"
-        if not re.search(r"\b%s\b" % stype, shared):
-            lines.append(f"static const int {stype};")
+    for name in NATIVE_EXTRA_STRUCTS:
+        m = _find(r"^typedef struct %s \{.*?^\} %s\s*;" % (name, name), text, name)
+        lines.append(m.group(0))
+        # A chained struct's sType: a member of WGPUSType, which in the shared
+        # cdef only has the members of the Emdawnwebgpu header.
+        if re.search(r"WGPUChainedStruct(Out)? chain;", m.group(0)):
+            line = _enum_member_line(f"WGPUSType_{name[len('WGPU') :]}", text, shared)
+            if line:
+                lines.append(line)
+    for name in NATIVE_EXTRA_FUNCTIONS:
+        m = _find(r"^[^\n]*\b%s\([^\n]*\)\s*;" % name, text, name)
+        lines.append(" ".join(m.group(0).split()))
+    for member in NATIVE_EXTRA_ENUM_MEMBERS:
+        line = _enum_member_line(member, text, shared)
+        if line:
+            lines.append(line)
     return "\n".join(lines) + "\n"
 
 

@@ -14,6 +14,9 @@ def get_h_parser(*, allow_cache=True):
 
     That is wgpudawn/_lib/webgpu_cdef.h: the cdef generated (by tools/gen_cdef.py)
     from Emdawnwebgpu's webgpu.h, a strict subset of Dawn's native webgpu.h.
+    The enum members that webgpu_native_extra_cdef.h adds for native builds
+    (``static const int WGPUFeatureName_X = ...;``) are merged into the enums,
+    so that the mappings know Dawn's native feature names.
     """
 
     # Singleton pattern
@@ -33,6 +36,12 @@ def get_h_parser(*, allow_cache=True):
     # Create parser
     hp = HParser(source)
     hp.parse()
+
+    # Native-only enum members
+    filename = os.path.join(lib_dir, "_lib", "webgpu_native_extra_cdef.h")
+    with open(filename, "rb") as f:
+        hp.add_enum_members(f.read().decode())
+
     _parser = hp
     return hp
 
@@ -42,6 +51,15 @@ class HParser:
 
     def __init__(self, source):
         self.source = source
+
+    def add_enum_members(self, source):
+        """Add the members declared as ``static const int WGPUEnum_Member = value;``
+        to the enums that this parser already has (the extra cdef of native builds)."""
+        for enum, member, value in re.findall(
+            r"^static const int WGPU(\w+?)_(\w+) = (0x[0-9A-Fa-f]+|\d+);", source, re.M
+        ):
+            if enum in self.enums:
+                self.enums[enum][member] = int(value, 0)
 
     def parse(self, verbose=True):
         self.flags = {}
