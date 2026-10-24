@@ -22,8 +22,11 @@ Whether this is due: `python tools/maintenance_status.py --only dawn` (it also
 says how many releases behind the pin is).
 
 Updating Dawn must not change the public API: that is defined by wgpu-py (see
-`upstream.json` and the `sync-upstream` skill). If a Dawn change forces an API
-change, stop at the last Dawn release that does not, and report it.
+`upstream.json` and the `sync-upstream` skill), plus Dawn's extras
+(`wgpudawn/backends/dawn/extras.py`). If a Dawn change forces an API change,
+stop at the last Dawn release that does not, and report it. Dawn's native-only
+API (shared memory, fences, `dawn/native/`) changes more often than
+`webgpu.h`'s standard part: adapt the extras to it, keeping their Python API.
 
 ## 1. Regenerate the bindings
 
@@ -40,7 +43,10 @@ prints what changed in the cdef. Read that output:
   in A", nothing `INCOMPATIBLE`. If that fails, the one-cdef-for-both-targets
   design does not hold for this release; try the previous release, and report.
 * Removed or renamed functions, struct fields and enum members are what the
-  backend has to adapt to. Additions need nothing unless the API needs them.
+  backend has to adapt to. Additions need nothing unless the API needs them;
+  new native-only features and functions (`WGPUFeatureName_*`, `Shared*`,
+  `dawn/native/*Backend.h`) go in the report as candidates for the
+  `dawn-extra` skill.
 
 If "Dawn: X -> X" (already at the target) and there is nothing else to do, say
 so and stop.
@@ -90,7 +96,7 @@ the surface source structs for each window system.
 ```sh
 pip install --no-deps ./tests/wgpu_shim
 ruff format . && ruff check .
-pytest tests codegen
+pytest tests codegen                     # includes test_dawn_extras.py: run it where the adapter has the features
 (cd ../pygfx-src && pytest tests)        # pygfx's unit tests on wgpudawn
 ```
 

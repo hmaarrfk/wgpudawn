@@ -152,6 +152,23 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-24 - Two goals: wgpu-py, and Dawn beyond WebGPU
+
+Same session as the light_view entry, continued.
+
+* The owner widened the project: besides being wgpu-py version for version,
+  wgpudawn exposes what Dawn can do beyond WebGPU (shared textures, buffers
+  and fences, the native objects of the backend, ...), with wgpu-py's API as
+  the reference wherever wgpu-py has, or later gets, the same capability.
+* README ("What this project is", a new section "Beyond WebGPU: Dawn's
+  extras" with the rules, what there is and what could come next, and the
+  three layers of Dawn in "How it works"), `CLAUDE.md`, and the skills
+  `sync-upstream`, `update-dawn` and `triage` now say so. New skill
+  `dawn-extra`: how to find a capability in Dawn's headers and tests, bind
+  it, design it after wgpu-py, and test it against the real other API.
+* Audit of the shared texture extras (0.32.0.0) and of what Dawn has that is
+  not bound: in the session's report to the owner; nothing changed in code.
+
 ## 2026-10-22 - Dawn's SharedTextureMemory and SharedFence as native extras, released as 0.32.0.0
 
 | | |

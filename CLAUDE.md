@@ -1,8 +1,19 @@
 # wgpudawn
 
 The wgpu-py API with a Dawn backend, as a standalone package that is
-co-installable with wgpu-py. The goal is to be a drop-in replacement for
-wgpu-py, version for version. Read `README.md` first.
+co-installable with wgpu-py. Read `README.md` first. Two goals, in this order:
+
+1. A drop-in replacement for wgpu-py, version for version. Code written for
+   wgpu-py runs unchanged; nothing below may change that.
+2. Expose what Dawn can do beyond WebGPU (shared textures, buffers and fences
+   with other APIs and processes, multi-planar formats, the native
+   Vulkan/Metal/D3D objects, ...) to Python, as Dawn's extras in
+   `wgpudawn/backends/dawn/extras.py`: native builds only, in the style of
+   wgpu-py, never altering the wgpu-py API, each tested against the real other
+   API. wgpu-py stays the reference: where it has the same capability (its
+   API or its wgpu-native extras), use its names and signatures, and follow
+   it when it adds one that wgpudawn had first. The `dawn-extra` skill says
+   how to add one.
 
 * `wgpudawn/`: derived from wgpu-py's `wgpu/`. Keep the diff with wgpu-py small
   (no reformatting or renaming of ported code); `upstream.json` records the
@@ -10,6 +21,12 @@ wgpu-py, version for version. Read `README.md` first.
 * `wgpudawn/enums.py`, `flags.py`, `structs.py`, `backends/dawn/_mappings.py`
   and the `# H:` / `# IDL:` comments are written by `python codegen`.
 * `wgpudawn/_lib/`: the cffi extension (`build_cffi.py`), Dawn statically linked.
+  Three layers of Dawn: `webgpu_cdef.h` (what Dawn's native header and
+  Emdawnwebgpu's share: the wgpu-py API), `webgpu_native_extra_cdef.h`
+  (native-only parts of Dawn's `webgpu.h` that the extras use; the lists in
+  `tools/gen_cdef.py`), and C++ functions on `dawn/native/` (Dawn's native
+  API, e.g. the Vulkan backend's handles) in `NATIVE_PREAMBLE` of
+  `build_cffi.py`. All of it is regenerated or rebuilt by `update-dawn`.
 * `wgpudawn.install_as_wgpu()` (`_as_wgpu.py`) is the opt-in way to make
   `import wgpu` resolve to wgpudawn at runtime. `tests/wgpu_shim/` is a test-only
   stand-in for wgpu-py that calls it. Never ship that, and never add a `wgpu`
@@ -40,6 +57,7 @@ follow it, also when you were not started through it.
 * `ci-doctor`: CI is red, or "why did this run fail".
 * `update-dawn`: move to a newer Dawn release (they are almost daily).
 * `sync-upstream`: port a new wgpu-py release or its main.
+* `dawn-extra`: expose a Dawn capability beyond WebGPU (goal 2).
 * `update-website`: newer pygfx or Pyodide on the website (`website/`), or an
   example that broke.
 * `refresh-infra`: actions, runner images, cibuildwheel, Python versions, npm

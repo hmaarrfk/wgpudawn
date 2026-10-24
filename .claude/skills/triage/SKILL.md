@@ -72,6 +72,7 @@ python -m venv ../venv-wgpu-py && ../venv-wgpu-py/bin/pip install -q wgpu numpy
 | `pip install` built from the sdist and failed with "Could not find Dawn" | no wheel for their platform (musl Linux, glibc < 2.28, macOS < 11, 32-bit, a Python below 3.11) | say which platforms have wheels (README, Platforms) and how to build from source; a platform that could reasonably get a wheel is a note for the owner, not a promise |
 | No adapter, or a device that cannot be created | usually their drivers | ask for the output of the snippet below, once |
 | They ask for wgpu-native extras, GLSL, the OpenGL backend | out of scope (README) | say so, kindly and without a "maybe later" |
+| They ask for something Dawn can do beyond WebGPU (shared memory, fences, native handles, a Dawn feature) | in scope: Dawn's extras (README, Beyond WebGPU) | the `dawn-extra` skill, when the request says what it is for; otherwise ask what they want to connect wgpudawn to |
 | An example on the website does not work | the website | `update-website`, step 3 |
 | Cannot reproduce | unknown | ask one precise question: the script, and the output of the snippet below |
 

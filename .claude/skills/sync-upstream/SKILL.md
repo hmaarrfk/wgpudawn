@@ -7,8 +7,11 @@ argument-hint: "[wgpu-py tag or 'main'] [dawn=latest] [release]"
 # Sync wgpudawn with wgpu-py (and Dawn)
 
 wgpudawn is wgpu-py with the wgpu-native backend replaced by a Dawn backend.
-Its goal is to be a drop-in replacement: for every wgpu-py release X.Y.Z there
-is a wgpudawn X.Y.Z.0 with the same API. `upstream.json` records what the code
+Its first goal is to be a drop-in replacement: for every wgpu-py release X.Y.Z
+there is a wgpudawn X.Y.Z.0 with the same API. (Its second, Dawn's extras
+beyond WebGPU in `wgpudawn/backends/dawn/extras.py`, is not wgpu-py's: a port
+keeps them working, `tests/test_dawn_extras.py` passing, and does not port
+wgpu-native's extras in their place.) `upstream.json` records what the code
 currently corresponds to. Your job is to move it forward and to leave the
 repository released or ready to release, with as little input from the user as
 possible. Do not ask questions that you can answer by reading or running code.
@@ -48,7 +51,7 @@ The source of each file, and how to carry a change over:
 | `wgpu/*.py`, `wgpu/utils/`, `wgpu/__pyinstaller/` | `wgpudawn/` (same name) | apply the diff; module references `wgpu.` -> `wgpudawn.`; the logger is `"wgpudawn"` |
 | `wgpu/resources/webgpu.idl` | `wgpudawn/resources/webgpu.idl` | copy, then run codegen (step 3) |
 | `wgpu/enums.py`, `flags.py`, `structs.py`, `resources/codegen_report.md` | same | never edit: codegen writes them |
-| `wgpu/backends/wgpu_native/_api.py`, `_helpers.py` | `wgpudawn/backends/dawn/_api.py`, `_helpers.py` | by hand: understand the change and make the equivalent one. The Dawn backend started as a copy, so most methods have the same structure, but it calls Dawn's `webgpu.h`, raises errors via `SafeLibCalls`, and has no `extras` |
+| `wgpu/backends/wgpu_native/_api.py`, `_helpers.py` | `wgpudawn/backends/dawn/_api.py`, `_helpers.py` | by hand: understand the change and make the equivalent one. The Dawn backend started as a copy, so most methods have the same structure, but it calls Dawn's `webgpu.h`, raises errors via `SafeLibCalls`, and has Dawn's `extras.py` instead of wgpu-native's (it uses `_api.py`'s helpers: a change to those is checked against it) |
 | `wgpu/backends/wgpu_native/extras.py`, `_poller.py`, `wgpu/resources/*.h`, `js_webgpu`, `tools/`, `docs/`, `tests_mem/` | - | not ported |
 | `codegen/` | `codegen/` | apply the diff. Here `wgpu_native_patcher.py` is `codegen/backend_patcher.py` (the validation and annotation of `_api.py`) plus `codegen/dawn_patcher.py` (which writes `_mappings.py`), `hparser.get_h_parser()` parses `wgpudawn/_lib/webgpu_cdef.h`, and only `backends/dawn` is patched |
 | `tests/*.py` | `tests/*.py` | apply the diff; `import wgpu` -> `import wgpudawn as wgpu`, `from wgpu` -> `from wgpudawn`. `test_wgpu_native_X.py` is `test_wgpu_X.py` here. Tests of wgpu-native specifics (extras, poller, naga error messages) are not ported |
