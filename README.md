@@ -62,6 +62,19 @@ Differences with wgpu-py:
   pipeline statistics queries, multi-draw-indirect-count, ...), and no
   wgpu-native specific features and limits. Dawn has its own non-standard
   features, e.g. `unorm16-texture-formats`.
+* Dawn's own extras, in `wgpudawn.backends.dawn.extras` (native builds only):
+  `import_shared_texture_memory()` makes a `GPUSharedTextureMemory` from
+  memory that another API or process owns (an IOSurface on macOS, a dmabuf on
+  Linux), `create_texture()` on it gives a texture to render into between
+  `begin_access()` and `end_access()`, and the `GPUSharedFence` objects that
+  `end_access()` returns export what to wait for (an `MTLSharedEvent` and its
+  value, a sync fd, or an opaque-fd semaphore); `import_shared_fence()` goes
+  the other way. The adapter lists what it supports in `adapter.features`
+  (`shared-texture-memory-i-o-surface`, `shared-texture-memory-dma-buf`,
+  `shared-fence-m-t-l-shared-event`, `shared-fence-sync-f-d`,
+  `shared-fence-vk-semaphore-opaque-f-d`); ask for them in the
+  `required_features` of `request_device_sync()`, or in the
+  `preferred_features` of `preconfigure_default_device()`.
 * Devices always have the `core-features-and-limits` feature.
 * The backends are Vulkan (Linux, Windows), Metal (macOS), and D3D12/D3D11
   (Windows). There is no OpenGL backend.
