@@ -231,11 +231,15 @@ def test_io_surface_round_trip():
 # --- Linux: dmabuf from GBM, sync fd ----------------------------------------
 
 
-class _GbmBuffer:
-    """A linear ARGB8888 dmabuf from GBM on the render node of the adapter
-    (a machine with several GPUs has several)."""
+def _fourcc(code):
+    return sum(ord(c) << (8 * i) for i, c in enumerate(code))
 
-    def __init__(self, adapter, width, height):
+
+class _GbmBuffer:
+    """A linear dmabuf from GBM on the render node of the adapter (a machine
+    with several GPUs has several), ARGB8888 by default."""
+
+    def __init__(self, adapter, width, height, drm_format="AR24", bpp=4):
         drm = extras.get_adapter_properties(adapter).get("drm") or {}
         node = drm.get("render_node")
         if not node:
@@ -271,18 +275,48 @@ class _GbmBuffer:
         self.dev = gbm.gbm_create_device(self.fd)
         if not self.dev:
             pytest.skip("gbm_create_device failed")
-        self.drm_format = (
-            ord("A") | (ord("R") << 8) | (ord("2") << 16) | (ord("4") << 24)
-        )  # AR24
+        self.drm_format = _fourcc(drm_format)
+        self.bpp = bpp
         self.bo = gbm.gbm_bo_create(
             self.dev, width, height, self.drm_format, (1 << 2) | (1 << 4)
         )  # rendering, linear
+        if not self.bo:  # e.g. R8 is not renderable everywhere
+            self.bo = gbm.gbm_bo_create(
+                self.dev, width, height, self.drm_format, 1 << 4
+            )
         if not self.bo:
             pytest.skip("gbm_bo_create failed")
         self.buffer_fd = gbm.gbm_bo_get_fd(self.bo)
         self.stride = gbm.gbm_bo_get_stride(self.bo)
         self.modifier = gbm.gbm_bo_get_modifier(self.bo)
         self.width, self.height = width, height
+
+    def _map(self, flags):
+        stride = ctypes.c_uint32(0)
+        data = ctypes.c_void_p(None)
+        p = self.gbm.gbm_bo_map(
+            self.bo,
+            0,
+            0,
+            self.width,
+            self.height,
+            flags,
+            ctypes.byref(stride),
+            ctypes.byref(data),
+        )
+        assert p, "gbm_bo_map failed"
+        buf = (ctypes.c_uint8 * (stride.value * self.height)).from_address(p)
+        rows = np.frombuffer(buf, np.uint8).reshape(self.height, stride.value)
+        return rows[:, : self.width * self.bpp], data
+
+    def write(self, data):
+        """Write rows of bytes (height, width * bpp) through the CPU. (A plain
+        mmap of the dmabuf is not coherent with the GPU everywhere.)"""
+        rows, handle = self._map(2)  # GBM_BO_TRANSFER_WRITE
+        try:
+            rows[:] = data
+        finally:
+            self.gbm.gbm_bo_unmap(self.bo, handle)
 
     def pixels(self):
         stride = ctypes.c_uint32(0)
@@ -455,3 +489,97 @@ def test_opaque_fd_round_trip():
         device.queue.on_submitted_work_done_sync()
         vk.release(image)
         vk.close()
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="dmabuf is Linux")
+def test_dma_buf_nv12_to_rgb():
+    # A video frame as a camera or decoder would give it: NV12 in a dmabuf
+    # that another API wrote (here GBM: an R8 buffer of 1.5 times the height,
+    # described as the two planes). Dawn imports it, and an external texture
+    # converts it to RGB.
+    if not can_use_wgpu_lib:
+        pytest.skip("Needs wgpu lib")
+    adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
+    needed = [DMA_BUF, "dawn-multi-planar-formats"]
+    if not all(f in adapter.features for f in needed):
+        pytest.skip(f"Adapter lacks one of {needed}")
+    fence_feature = next(
+        (f for f in (SYNC_FD, OPAQUE_FD) if f in adapter.features), None
+    )
+    device = adapter.request_device_sync(
+        required_features=needed + ([fence_feature] if fence_feature else [])
+    )
+    w, h = WIDTH, HEIGHT
+    buffer = _GbmBuffer(adapter, w, h * 3 // 2, drm_format="R8  ", bpp=1)
+    rng = np.random.default_rng(0)
+    y = rng.integers(16, 236, (h, w), np.uint8)
+    uv = rng.integers(16, 241, (h // 2, w // 2, 2), np.uint8)
+    buffer.write(np.concatenate([y, uv.reshape(h // 2, w)]))
+
+    memory = extras.import_shared_texture_memory(
+        device,
+        dma_buf={
+            "size": (w, h),
+            "drm_format": _fourcc("NV12"),
+            "drm_modifier": buffer.modifier,
+            "planes": [
+                {"fd": buffer.buffer_fd, "offset": 0, "stride": buffer.stride},
+                {
+                    "fd": buffer.buffer_fd,
+                    "offset": buffer.stride * h,
+                    "stride": buffer.stride,
+                },
+            ],
+        },
+    )
+    assert memory.properties["format"] == "r8bg8-biplanar-420-unorm"
+    texture = memory.create_texture()
+    memory.begin_access(texture, initialized=True)
+    external = extras.create_external_texture(
+        device,
+        texture.create_view(aspect="plane0-only"),
+        texture.create_view(aspect="plane1-only"),
+        color_space="bt709",
+    )
+    shader = device.create_shader_module(
+        code="""
+        @group(0) @binding(0) var t: texture_external;
+        @group(0) @binding(1) var<storage, read_write> out: array<vec4f>;
+        @compute @workgroup_size(1) fn main(@builtin(global_invocation_id) i: vec3u) {
+            out[i.y * textureDimensions(t).x + i.x] = textureLoad(t, i.xy);
+        }
+        """
+    )
+    layout = device.create_bind_group_layout(
+        entries=[
+            {"binding": 0, "visibility": "COMPUTE", "external_texture": {}},
+            {"binding": 1, "visibility": "COMPUTE", "buffer": {"type": "storage"}},
+        ]
+    )
+    pipeline = device.create_compute_pipeline(
+        layout=device.create_pipeline_layout(bind_group_layouts=[layout]),
+        compute={"module": shader, "entry_point": "main"},
+    )
+    out = device.create_buffer(size=w * h * 16, usage="STORAGE|COPY_SRC")
+    bind_group = device.create_bind_group(
+        layout=layout,
+        entries=[
+            {"binding": 0, "resource": external},
+            {"binding": 1, "resource": {"buffer": out}},
+        ],
+    )
+    encoder = device.create_command_encoder()
+    cpass = encoder.begin_compute_pass()
+    cpass.set_pipeline(pipeline)
+    cpass.set_bind_group(0, bind_group)
+    cpass.dispatch_workgroups(w, h)
+    cpass.end()
+    device.queue.submit([encoder.finish()])
+    memory.end_access(texture)
+    rgb = np.frombuffer(device.queue.read_buffer(out), np.float32)
+    rgb = rgb.reshape(h, w, 4)[..., :3]
+
+    m = np.array(extras.get_yuv_to_rgb_matrix("bt709")).reshape(3, 4)
+    full_uv = np.repeat(np.repeat(uv / 255, 2, 0), 2, 1)
+    yuv = np.concatenate([y[..., None] / 255, full_uv, np.ones((h, w, 1))], -1)
+    assert np.abs(rgb - yuv @ m.T).max() < 1e-3

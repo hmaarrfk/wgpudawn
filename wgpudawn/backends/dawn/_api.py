@@ -1233,6 +1233,7 @@ class GPUObjectBase(classes.GPUObjectBase):
             # H: void wgpuTextureRelease(WGPUTexture texture)
             # H: void wgpuTextureViewRelease(WGPUTextureView textureView)
             # H: void wgpuSamplerRelease(WGPUSampler sampler)
+            # H: void wgpuExternalTextureRelease(WGPUExternalTexture externalTexture)
             # H: void wgpuBindGroupLayoutRelease(WGPUBindGroupLayout bindGroupLayout)
             # H: void wgpuBindGroupRelease(WGPUBindGroup bindGroup)
             # H: void wgpuPipelineLayoutRelease(WGPUPipelineLayout pipelineLayout)
@@ -1690,12 +1691,15 @@ class GPUDevice(classes.GPUDevice, GPUObjectBase):
         self, *, label: str = "", entries: Sequence[structs.BindGroupLayoutEntryStruct]
     ) -> GPUBindGroupLayout:
         c_entries_list = []
+        keep_alive = []  # chained structs, alive until the call below
         for entry in entries:
             check_struct("BindGroupLayoutEntry", entry)
             buffer = entry.get("buffer")
             sampler = entry.get("sampler")
             texture = entry.get("texture")
             storage_texture = entry.get("storage_texture")
+            external_texture = entry.get("external_texture")
+            c_next = _NULL
             if buffer is not None:  # Note, it might be an empty dictionary
                 info = buffer
                 sampler = texture = storage_texture = ()
@@ -1755,19 +1759,29 @@ class GPUDevice(classes.GPUDevice, GPUObjectBase):
                     viewDimension=view_dimension,
                     format=info["format"],
                 )
+            elif external_texture is not None:  # It may be an empty dictionary
+                info = external_texture
+                buffer = sampler = texture = storage_texture = ()
+                check_struct("ExternalTextureBindingLayout", info)
+                # H: chain: WGPUChainedStruct
+                c_external = new_struct_p(
+                    "WGPUExternalTextureBindingLayout *",
+                    # not used: chain
+                )
+                c_external.chain.sType = lib.WGPUSType_ExternalTextureBindingLayout
+                c_next = ffi.cast("WGPUChainedStruct *", c_external)
+                keep_alive.append(c_external)
             else:
                 raise ValueError(
-                    "Bind group layout entry did not contain field 'buffer', 'sampler', 'texture', nor 'storage_texture'"
+                    "Bind group layout entry did not contain field 'buffer', 'sampler', 'texture', 'storage_texture', nor 'external_texture'"
                 )
-                # Unreachable - fool the codegen
-                check_struct("ExternalTextureBindingLayout", info)
             visibility = entry["visibility"]
             if isinstance(visibility, str):
                 visibility = str_flag_to_int(flags.ShaderStage, visibility)
             # H: nextInChain: WGPUChainedStruct *, binding: int, visibility: WGPUShaderStage/int, bindingArraySize: int, buffer: WGPUBufferBindingLayout, sampler: WGPUSamplerBindingLayout, texture: WGPUTextureBindingLayout, storageTexture: WGPUStorageTextureBindingLayout
             c_entry = new_struct(
                 "WGPUBindGroupLayoutEntry",
-                # not used: nextInChain
+                nextInChain=c_next,
                 binding=int(entry["binding"]),
                 visibility=int(visibility),
                 buffer=buffer,
@@ -1830,6 +1844,16 @@ class GPUDevice(classes.GPUDevice, GPUObjectBase):
                     resource = resource.create_view()
                     keep_alive.append(resource)
                 c_entry.textureView = resource._internal
+            elif isinstance(resource, GPUExternalTexture):
+                # H: chain: WGPUChainedStruct, externalTexture: WGPUExternalTexture
+                c_external = new_struct_p(
+                    "WGPUExternalTextureBindingEntry *",
+                    externalTexture=resource._internal,
+                    # not used: chain
+                )
+                c_external.chain.sType = lib.WGPUSType_ExternalTextureBindingEntry
+                c_entry.nextInChain = ffi.cast("WGPUChainedStruct *", c_external)
+                keep_alive.append(c_external)
             elif isinstance(resource, (structs.BufferBinding, dict)):
                 c_entry.buffer = resource["buffer"]._internal
                 c_entry.offset = resource.get("offset", 0)
@@ -2740,7 +2764,12 @@ class GPUTexture(classes.GPUTexture, GPUObjectBase):
     ) -> GPUTextureView:
         # Resolve defaults
         if not format:
-            format = self._tex_info["format"]
+            if aspect and aspect != "all":
+                # The format of that aspect (e.g. stencil8 of depth24plus-stencil8,
+                # r8unorm of a plane of r8bg8-biplanar-420-unorm), resolved by Dawn
+                format = 0
+            else:
+                format = self._tex_info["format"]
         if not dimension:
             dimension = self._tex_info["dimension"]  # from create_texture
         elif not isinstance(dimension, str):
@@ -2797,6 +2826,16 @@ class GPUTextureView(classes.GPUTextureView, GPUObjectBase):
 class GPUSampler(classes.GPUSampler, GPUObjectBase):
     # GPUObjectBaseMixin
     _release_function = libf.wgpuSamplerRelease
+
+
+# FIXME: unknown api: class GPUExternalTexture
+class GPUExternalTexture(GPUObjectBase):
+    """A texture that is sampled with a conversion to RGB, e.g. of a video
+    frame with planes of YUV data (``texture_external`` in WGSL). Dawn's
+    native API makes them: see ``wgpudawn.backends.dawn.extras``."""
+
+    # GPUObjectBaseMixin
+    _release_function = libf.wgpuExternalTextureRelease
 
 
 class GPUBindGroupLayout(classes.GPUBindGroupLayout, GPUObjectBase):
@@ -3428,7 +3467,7 @@ class GPUCommandEncoder(
             texture=destination["texture"]._internal,
             mipLevel=int(destination.get("mip_level", 0)),
             origin=c_origin,
-            aspect=enums.TextureAspect.all,
+            aspect=destination.get("aspect", "all"),
         )
 
         # H: width: int, height: int, depthOrArrayLayers: int
@@ -3481,7 +3520,7 @@ class GPUCommandEncoder(
             texture=source["texture"]._internal,
             mipLevel=int(source.get("mip_level", 0)),
             origin=c_origin,
-            aspect=0,
+            aspect=source.get("aspect", "all"),
         )
 
         # H: layout: WGPUTexelCopyBufferLayout, buffer: WGPUBuffer
@@ -3541,7 +3580,7 @@ class GPUCommandEncoder(
             texture=source["texture"]._internal,
             mipLevel=int(source.get("mip_level", 0)),
             origin=c_origin1,
-            # not used: aspect
+            aspect=source.get("aspect", "all"),
         )
 
         ori = _tuple_from_origin3d(destination)
@@ -3558,7 +3597,7 @@ class GPUCommandEncoder(
             texture=destination["texture"]._internal,
             mipLevel=int(destination.get("mip_level", 0)),
             origin=c_origin2,
-            # not used: aspect
+            aspect=destination.get("aspect", "all"),
         )
 
         size = _tuple_from_extent3d(copy_size)
@@ -3986,7 +4025,7 @@ class GPUQueue(classes.GPUQueue, GPUObjectBase):
             texture=destination["texture"]._internal,
             mipLevel=destination.get("mip_level", 0),
             origin=c_origin,
-            aspect=enums.TextureAspect.all,
+            aspect=destination.get("aspect", "all"),
         )
 
         # H: offset: int, bytesPerRow: int, rowsPerImage: int

@@ -407,3 +407,43 @@ def test_bind_group_resources():
     bind_group = device.create_bind_group(layout=layout, entries=entires)
 
     assert bind_group
+
+
+def test_aspects_of_views_and_copies():
+    # A view of one aspect takes that aspect's format by default, and copies
+    # use the aspect that is given (both were always "all" before)
+    device = wgpu.utils.get_default_device()
+    texture = device.create_texture(
+        size=(4, 4, 1),
+        format="depth24plus-stencil8",
+        usage=wgpu.TextureUsage.RENDER_ATTACHMENT
+        | wgpu.TextureUsage.TEXTURE_BINDING
+        | wgpu.TextureUsage.COPY_SRC,
+    )
+    view = texture.create_view(aspect="stencil-only")
+    assert view.texture is texture
+    texture.create_view(aspect="depth-only")
+
+    encoder = device.create_command_encoder()
+    rpass = encoder.begin_render_pass(
+        color_attachments=[],
+        depth_stencil_attachment={
+            "view": texture.create_view(),
+            "depth_clear_value": 1.0,
+            "depth_load_op": "clear",
+            "depth_store_op": "store",
+            "stencil_clear_value": 7,
+            "stencil_load_op": "clear",
+            "stencil_store_op": "store",
+        },
+    )
+    rpass.end()
+    buffer = device.create_buffer(size=256 * 4, usage="COPY_DST|COPY_SRC")
+    encoder.copy_texture_to_buffer(
+        {"texture": texture, "aspect": "stencil-only"},
+        {"buffer": buffer, "bytes_per_row": 256},
+        (4, 4, 1),
+    )
+    device.queue.submit([encoder.finish()])
+    data = np.frombuffer(device.queue.read_buffer(buffer), np.uint8).reshape(4, 256)
+    assert (data[:, :4] == 7).all()

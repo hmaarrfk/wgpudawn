@@ -2,6 +2,8 @@
 (feature ``host-mapped-pointer``). See extras.py.
 """
 
+import mmap
+
 from ... import enums, flags
 from ..._coreutils import str_flag_to_int
 from . import _api
@@ -42,13 +44,18 @@ def get_host_memory_alignment(device: GPUDevice):
 def allocate_host_memory(device: GPUDevice, size: int):
     """A writable ``memoryview`` of ``size`` bytes (rounded up to the
     alignment) that :func:`create_buffer_from_host_memory` can use. For a
-    numpy array: ``np.frombuffer(memory, dtype)``."""
+    numpy array: ``np.frombuffer(memory, dtype)``.
+
+    The memory is pages of its own (an anonymous ``mmap``), which is what
+    Metal and D3D12 need: they refuse memory that is part of a ``malloc``
+    allocation, such as that of most numpy arrays, even when it is aligned.
+    """
     alignment = get_host_memory_alignment(device)
     size = -(-int(size) // alignment) * alignment
-    raw = bytearray(size + alignment)
-    address = int(ffi.cast("uintptr_t", ffi.from_buffer(raw)))
-    offset = -address % alignment
-    return memoryview(raw)[offset : offset + size]
+    pages = mmap.mmap(-1, size + alignment)
+    address = int(ffi.cast("uintptr_t", ffi.from_buffer(pages)))
+    offset = -address % alignment  # mmap gives pages; the alignment may be larger
+    return memoryview(pages)[offset : offset + size]
 
 
 def create_buffer_from_host_memory(
@@ -65,7 +72,10 @@ def create_buffer_from_host_memory(
         data: Writable, contiguous memory that supports the buffer protocol (a
             numpy array, a ``bytearray``, a ``memoryview``), whose address and
             size are multiples of :func:`get_host_memory_alignment`;
-            :func:`allocate_host_memory` makes such memory.
+            :func:`allocate_host_memory` makes such memory. On macOS and
+            Windows it must be pages of its own (``mmap``, ``vm_allocate``,
+            ``VirtualAlloc``): Dawn loses the device for part of a ``malloc``
+            block.
         usage (BufferUsageFlags): The usage of the buffer.
         label (str): A human-readable label. Optional.
 

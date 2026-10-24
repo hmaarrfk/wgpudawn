@@ -24,14 +24,15 @@
 * Validated 39 classes, 123 methods, 52 properties
 ### Patching API for backends/dawn/_api.py
 * Diffs for GPUDevice: add pop_error_scope_async, add push_error_scope
-* Validated 39 classes, 114 methods, 0 properties
+* Warning: unknown api: class GPUExternalTexture
+* Validated 40 classes, 114 methods, 0 properties
 * Found 0 methods not implemented
 ## Validating backends/dawn/_api.py
 * Enum PipelineErrorReason missing in Dawn's webgpu.h
 * Enum AutoLayoutMode missing in Dawn's webgpu.h
 * Enum CanvasAlphaMode missing in Dawn's webgpu.h
 * Enum CanvasToneMappingMode missing in Dawn's webgpu.h
-* Wrote 268 enum mappings and 48 struct-field mappings to dawn/_mappings.py
-* Validated 148 C function calls
-* Not using 67 C functions
-* Validated 87 C structs
+* Wrote 279 enum mappings and 48 struct-field mappings to dawn/_mappings.py
+* Validated 149 C function calls
+* Not using 66 C functions
+* Validated 89 C structs

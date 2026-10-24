@@ -180,10 +180,23 @@ What there is:
   memory): the GPU reads and writes it directly. Feature
   `host-mapped-pointer` (experimental; Vulkan except on AMD, Metal, D3D12).
 
+* **Video frames: multi-planar formats and external textures.** With the
+  `dawn-multi-planar-formats` feature, textures can be NV12
+  (`r8bg8-biplanar-420-unorm`), P010 (`r10x6bg10x6-biplanar-420-unorm`) and
+  the other 4:2:0, 4:2:2 and 4:4:4 formats, made by Dawn
+  (`multi-planar-format-extended-usages`, experimental) or imported (e.g. a
+  dmabuf from a camera or a video decoder); their planes are views and
+  copies with `aspect="plane0-only"` / `"plane1-only"`.
+  `create_external_texture()` makes a texture that a shader samples as
+  `texture_external`, converted to RGB on the fly (BT.601, BT.709, BT.2020,
+  limited or full range, or any matrix; optionally color-managed with
+  transfer functions and a gamut matrix), with crop, rotation and mirroring.
+  It is bound with `{"external_texture": {}}` in the bind group layout.
+
 What Dawn has that could come next (Dawn's `dawn/webgpu.h` and
 `dawn/native/*Backend.h`): shared texture memory on Windows (D3D12 resources, D3D11 textures, DXGI shared handles), from EGL
 images and Android hardware buffers; shared buffer memory (Windows);
-multi-planar formats (NV12, P010, ...) and external textures; the native
+the native
 `ID3D12Device`, `ID3D11Device` and `MTLDevice`; pixel local storage,
 framebuffer fetch. They are added one at a time, each with a test against the
 real other API (the `dawn-extra` skill).

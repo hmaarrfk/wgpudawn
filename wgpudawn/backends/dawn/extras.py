@@ -65,6 +65,7 @@ from ._extras_device import (
     set_instance_extras,
 )
 from ._extras_adapter import get_adapter_properties, get_format_capabilities
+from ._extras_video import create_external_texture, get_yuv_to_rgb_matrix
 from ._extras_memory import (
     allocate_host_memory,
     create_buffer_from_host_memory,
@@ -86,6 +87,7 @@ __all__ = [
     "all_toggles",
     "allocate_host_memory",
     "create_buffer_from_host_memory",
+    "create_external_texture",
     "feature_info",
     "get_adapter_properties",
     "get_format_capabilities",
@@ -94,6 +96,7 @@ __all__ = [
     "get_toggles",
     "get_vk_instance",
     "get_vk_instance_proc_addr",
+    "get_yuv_to_rgb_matrix",
     "import_shared_fence",
     "import_shared_texture_memory",
     "multi_draw_indexed_indirect",

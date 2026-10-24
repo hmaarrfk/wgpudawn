@@ -18,6 +18,13 @@ typedef enum WGPUSharedFenceType {
     WGPUSharedFenceType_EGLSync = 0x00000006,
     WGPUSharedFenceType_Force32 = 0x7FFFFFFF
 } WGPUSharedFenceType ;
+typedef enum WGPUExternalTextureRotation {
+    WGPUExternalTextureRotation_Rotate0Degrees = 0x00000001,
+    WGPUExternalTextureRotation_Rotate90Degrees = 0x00000002,
+    WGPUExternalTextureRotation_Rotate180Degrees = 0x00000003,
+    WGPUExternalTextureRotation_Rotate270Degrees = 0x00000004,
+    WGPUExternalTextureRotation_Force32 = 0x7FFFFFFF
+} WGPUExternalTextureRotation ;
 typedef struct WGPUSurfaceSourceXlibWindow {
     WGPUChainedStruct chain;
     void * display;
@@ -213,6 +220,30 @@ typedef struct WGPUDawnHostMappedPointerLimits {
     uint32_t hostMappedPointerAlignment;
 } WGPUDawnHostMappedPointerLimits ;
 static const int WGPUSType_DawnHostMappedPointerLimits = 0x00050043;
+typedef struct WGPUOrigin2D {
+    uint32_t x;
+    uint32_t y;
+} WGPUOrigin2D ;
+typedef struct WGPUExtent2D {
+    uint32_t width;
+    uint32_t height;
+} WGPUExtent2D ;
+typedef struct WGPUExternalTextureDescriptor {
+    WGPUChainedStruct * nextInChain;
+    WGPUStringView label;
+    WGPUTextureView plane0;
+    WGPUTextureView plane1;
+    WGPUOrigin2D cropOrigin;
+    WGPUExtent2D cropSize;
+    WGPUExtent2D apparentSize;
+    WGPUBool doYuvToRgbConversionOnly;
+    float const * yuvToRgbConversionMatrix;
+    float const * srcTransferFunctionParameters;
+    float const * dstTransferFunctionParameters;
+    float const * gamutConversionMatrix;
+    WGPUBool mirrored;
+    WGPUExternalTextureRotation rotation;
+} WGPUExternalTextureDescriptor ;
 WGPUSharedTextureMemory wgpuDeviceImportSharedTextureMemory(WGPUDevice device, WGPUSharedTextureMemoryDescriptor const * descriptor) ;
 WGPUSharedFence wgpuDeviceImportSharedFence(WGPUDevice device, WGPUSharedFenceDescriptor const * descriptor) ;
 WGPUStatus wgpuSharedTextureMemoryGetProperties(WGPUSharedTextureMemory sharedTextureMemory, WGPUSharedTextureMemoryProperties * properties) ;
@@ -230,6 +261,7 @@ void wgpuAdapterPropertiesMemoryHeapsFreeMembers(WGPUAdapterPropertiesMemoryHeap
 WGPUStatus wgpuAdapterGetFormatCapabilities(WGPUAdapter adapter, WGPUTextureFormat format, WGPUDawnFormatCapabilities * capabilities) ;
 void wgpuDawnDrmFormatCapabilitiesFreeMembers(WGPUDawnDrmFormatCapabilities dawnDrmFormatCapabilities) ;
 void wgpuDeviceTick(WGPUDevice device) ;
+WGPUExternalTexture wgpuDeviceCreateExternalTexture(WGPUDevice device, WGPUExternalTextureDescriptor const * externalTextureDescriptor) ;
 static const int WGPUSType_AdapterPropertiesVulkanUUIDs = 0x00050056;
 static const int WGPUFeatureName_DawnInternalUsages = 0x00050000;
 static const int WGPUFeatureName_DawnMultiPlanarFormats = 0x00050001;
@@ -294,3 +326,14 @@ static const int WGPUFeatureName_AdapterPropertiesDrm = 0x0005003F;
 static const int WGPUFeatureName_DawnAllowUndefinedLoadStoreOp = 0x00050040;
 static const int WGPUFeatureName_BufferMapWriteExtendedUsages = 0x00050041;
 static const int WGPUFeatureName_SharedBufferMemoryHostPointer = 0x00050042;
+static const int WGPUTextureFormat_R8BG8Biplanar420Unorm = 0x00050000;
+static const int WGPUTextureFormat_R10X6BG10X6Biplanar420Unorm = 0x00050001;
+static const int WGPUTextureFormat_R8BG8A8Triplanar420Unorm = 0x00050002;
+static const int WGPUTextureFormat_R8BG8Biplanar422Unorm = 0x00050003;
+static const int WGPUTextureFormat_R8BG8Biplanar444Unorm = 0x00050004;
+static const int WGPUTextureFormat_R10X6BG10X6Biplanar422Unorm = 0x00050005;
+static const int WGPUTextureFormat_R10X6BG10X6Biplanar444Unorm = 0x00050006;
+static const int WGPUTextureFormat_OpaqueYCbCrAndroid = 0x00050007;
+static const int WGPUTextureAspect_Plane0Only = 0x00050000;
+static const int WGPUTextureAspect_Plane1Only = 0x00050001;
+static const int WGPUTextureAspect_Plane2Only = 0x00050002;

@@ -68,6 +68,7 @@ NATIVE_EXTRA_FLAGS = [  # typedef WGPUFlags X; and its constants
 ]
 NATIVE_EXTRA_ENUMS = [
     "WGPUSharedFenceType",
+    "WGPUExternalTextureRotation",
 ]
 NATIVE_EXTRA_STRUCTS = [
     "WGPUSurfaceSourceXlibWindow",
@@ -104,6 +105,9 @@ NATIVE_EXTRA_STRUCTS = [
     "WGPUDawnDrmFormatCapabilities",
     "WGPUBufferHostMappedPointer",
     "WGPUDawnHostMappedPointerLimits",
+    "WGPUOrigin2D",
+    "WGPUExtent2D",
+    "WGPUExternalTextureDescriptor",
 ]
 NATIVE_EXTRA_FUNCTIONS = [
     "wgpuDeviceImportSharedTextureMemory",
@@ -123,6 +127,7 @@ NATIVE_EXTRA_FUNCTIONS = [
     "wgpuAdapterGetFormatCapabilities",
     "wgpuDawnDrmFormatCapabilitiesFreeMembers",
     "wgpuDeviceTick",
+    "wgpuDeviceCreateExternalTexture",
 ]
 NATIVE_EXTRA_ENUM_MEMBERS = [  # of enums that the shared cdef has
     # Its struct is in dawn/native/VulkanBackend.h (see dawn_native_cdef.h)
@@ -132,6 +137,8 @@ NATIVE_EXTRA_ENUM_MEMBERS = [  # of enums that the shared cdef has
 # Dawn's features, so that adapters and devices list them in ``features``.
 NATIVE_EXTRA_ALL_MEMBERS_OF = [
     "WGPUFeatureName",
+    "WGPUTextureFormat",  # multi-planar (video) formats
+    "WGPUTextureAspect",  # their planes
 ]
 
 

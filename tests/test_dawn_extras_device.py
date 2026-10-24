@@ -12,6 +12,7 @@ import subprocess
 import sys
 import textwrap
 
+import numpy as np
 import pytest
 
 import wgpudawn as wgpu
@@ -429,3 +430,105 @@ HOST_MEMORY = """
 
 def test_host_memory():
     run_in_subprocess(HOST_MEMORY)
+
+
+# %% Video: multi-planar formats and external textures
+
+
+def test_yuv_to_rgb_matrix():
+    m = np.array(extras.get_yuv_to_rgb_matrix("bt709")).reshape(3, 4)
+    # Limited range: black (16, 128, 128) and white (235, 128, 128) of 8 bits
+    black = m @ [16 / 255, 128 / 255, 128 / 255, 1]
+    white = m @ [235 / 255, 128 / 255, 128 / 255, 1]
+    assert np.allclose(black, 0, atol=1e-6) and np.allclose(white, 1, atol=1e-6)
+    full = np.array(extras.get_yuv_to_rgb_matrix("bt601", full_range=True)).reshape(
+        3, 4
+    )
+    assert np.allclose(full @ [1, 128 / 255, 128 / 255, 1], 1, atol=1e-6)
+    # Pure red in BT.709 (Y, Cb, Cr) = (0.2126, -0.1146, 0.5) in full range
+    full_709 = np.array(extras.get_yuv_to_rgb_matrix("bt709", full_range=True))
+    red = full_709.reshape(3, 4) @ [0.2126, 128 / 255 - 0.1146, 128 / 255 + 0.5, 1]
+    assert np.allclose(red, [1, 0, 0], atol=2e-3), red
+
+
+NV12 = """
+    import numpy as np
+    extras.set_instance_extras(enable_toggles=["allow_unsafe_apis"])
+    adapter = wgpu.gpu.request_adapter_sync()
+    needed = ["dawn-multi-planar-formats", "multi-planar-format-extended-usages"]
+    if not all(f in adapter.features for f in needed):
+        print("SKIP adapter lacks", needed)
+        raise SystemExit
+    device = adapter.request_device_sync(required_features=needed)
+    W, H = 4, 2
+    texture = device.create_texture(
+        size=(W, H, 1),
+        format="r8bg8-biplanar-420-unorm",
+        usage=wgpu.TextureUsage.TEXTURE_BINDING | wgpu.TextureUsage.COPY_DST,
+    )
+    assert texture.format == "r8bg8-biplanar-420-unorm"
+    Y = np.array([[16, 60, 120, 235], [100, 150, 200, 81]], np.uint8)
+    UV = np.array([[[128, 128], [90, 240]]], np.uint8)
+    device.queue.write_texture(
+        {"texture": texture, "aspect": "plane0-only"}, Y, {"bytes_per_row": W}, (W, H, 1))
+    device.queue.write_texture(
+        {"texture": texture, "aspect": "plane1-only"}, UV, {"bytes_per_row": W},
+        (W // 2, H // 2, 1))
+    plane0 = texture.create_view(aspect="plane0-only")
+    plane1 = texture.create_view(aspect="plane1-only")
+    assert plane0.texture is texture
+
+    shader = device.create_shader_module(code='''
+        @group(0) @binding(0) var t: texture_external;
+        @group(0) @binding(1) var<storage, read_write> out: array<vec4f>;
+        @compute @workgroup_size(1) fn main(@builtin(global_invocation_id) i: vec3u) {
+            out[i.y * textureDimensions(t).x + i.x] = textureLoad(t, i.xy);
+        }
+    ''')
+    layout = device.create_bind_group_layout(entries=[
+        {"binding": 0, "visibility": "COMPUTE", "external_texture": {}},
+        {"binding": 1, "visibility": "COMPUTE", "buffer": {"type": "storage"}},
+    ])
+    pipeline = device.create_compute_pipeline(
+        layout=device.create_pipeline_layout(bind_group_layouts=[layout]),
+        compute={"module": shader, "entry_point": "main"},
+    )
+
+    def convert(external, size):
+        out = device.create_buffer(size=size[0] * size[1] * 16, usage="STORAGE|COPY_SRC")
+        bind_group = device.create_bind_group(layout=layout, entries=[
+            {"binding": 0, "resource": external},
+            {"binding": 1, "resource": {"buffer": out}},
+        ])
+        encoder = device.create_command_encoder()
+        cpass = encoder.begin_compute_pass()
+        cpass.set_pipeline(pipeline)
+        cpass.set_bind_group(0, bind_group)
+        cpass.dispatch_workgroups(*size)
+        cpass.end()
+        device.queue.submit([encoder.finish()])
+        data = device.queue.read_buffer(out)
+        return np.frombuffer(data, np.float32).reshape(size[1], size[0], 4)[..., :3]
+
+    # Each pixel: the 3x4 matrix times (Y, U, V, 1), not clamped
+    m = np.array(extras.get_yuv_to_rgb_matrix("bt709")).reshape(3, 4)
+    uv = np.repeat(np.repeat(UV / 255, 2, 0), 2, 1)
+    yuv = np.concatenate([Y[..., None] / 255, uv, np.ones((H, W, 1))], -1)
+    expected = yuv @ m.T
+    external = extras.create_external_texture(device, plane0, plane1, color_space="bt709")
+    rgb = convert(external, (W, H))
+    assert np.abs(rgb - expected).max() < 1e-3, (rgb, expected)
+
+    # Crop and rotate: the shader sees the rotated 2x2 crop of the right half
+    external = extras.create_external_texture(
+        device, plane0, plane1, crop_origin=(2, 0), crop_size=(2, 2), rotation=90
+    )
+    rgb = convert(external, (2, 2))
+    crop = expected[:, 2:]
+    assert np.abs(rgb - np.rot90(crop, -1)).max() < 1e-3, (rgb, crop)
+    print("OK")
+"""
+
+
+def test_nv12_external_texture():
+    run_in_subprocess(NV12)

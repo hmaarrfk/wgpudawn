@@ -31,6 +31,14 @@ def _kebab(name):
     return to_snake_case(name).replace("_", "-")
 
 
+def _format_name(name):
+    """A Dawn texture format in WebGPU's style: R8BG8Biplanar420Unorm ->
+    r8bg8-biplanar-420-unorm."""
+    import re
+
+    return re.sub(r"(?<=[a-z])(?=[0-9])|(?<=[0-9])(?=[A-Z][a-z])", "-", name).lower()
+
+
 def write_mappings():
     """Write backends/dawn/_mappings.py."""
 
@@ -54,6 +62,16 @@ def write_mappings():
                 enummap[name + "." + ikey] = hp_enum[hkey]
             else:
                 print(f"Enum field {name}.{ikey} missing in Dawn's webgpu.h")
+
+    # Dawn's own members of these enums (native only): the multi-planar video
+    # formats, e.g. r8bg8-biplanar-420-unorm (NV12), and the planes as aspects
+    native_names = {}
+    for name, to_name in (("TextureFormat", _format_name), ("TextureAspect", _kebab)):
+        known = set(enummap[k] for k in enummap if k.startswith(name + "."))
+        for key, val in hp.enums[name].items():
+            if key not in ("Force32", "Undefined") and val not in known:
+                enummap[f"{name}.{to_name(key)}"] = val
+                native_names[(name, val)] = to_name(key)
 
     pylines.append(f"# There are {len(enummap)} enum mappings\n")
     pylines.append("enummap = {")
@@ -114,7 +132,7 @@ def write_mappings():
         for key, val in hp.enums[name].items():
             if key == "Force32":
                 continue
-            enum_val = webgpu_names.get(key.lower(), key)
+            enum_val = webgpu_names.get(key.lower(), native_names.get((name, val), key))
             pylines.append(f'        {val}: "{enum_val}",')
         pylines.append("    },")
     pylines.append("}")
