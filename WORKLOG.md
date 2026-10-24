@@ -50,6 +50,15 @@ in parentheses.
 
 **Doing the work**
 
+* A constant in the cdef can carry its value and still be checked: cffi's API
+  mode compares `static const int X = value;` with the real header when the
+  extension is built, and a wrong value fails the build. So native-only enum
+  members (sTypes, feature names) are written with their values, which is
+  what lets codegen read them. (2026-10-24)
+* A fence or handle that an API object owns dies with the object: keep the
+  object, not only the exported fd or pointer, until the wait is done; a
+  closed fd polls as ready at once (`POLLNVAL`), which looks like success.
+  (2026-10-24)
 * Make the truth mechanical. Every claim the project makes is produced by a
   command: the version by the git tag, the bindings by `tools/update_dawn.py`,
   "this example works" by `website/check.mjs`, the numbers in this file by
@@ -142,6 +151,68 @@ in parentheses.
 ## Sessions
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
+
+## 2026-10-22 - Dawn's SharedTextureMemory and SharedFence as native extras, released as 0.32.0.0
+
+| | |
+|---|---|
+| Session | `348e978e-7214-4dbf-b4bc-ccbd13f6008c` |
+| When (UTC) | 2026-10-22T18:25:24+00:00 to 2026-10-24T12:07:11+00:00 |
+| Duration | 41.7 h wall clock, 6.83 h agent working |
+| Human prompts | 91 (9095 words) |
+| Subagents | 3 |
+| Model | `<synthetic>` (Anthropic): 1 requests; tokens: 0 input, 0 output, 0 cache read, 0 cache write; price unknown |
+| Model | `claude-fable-5-1` (Anthropic): 132 requests; tokens: 3,554 input, 386,301 output, 55,377,334 cache read, 3,798,853 cache write; $80.68 at API list prices |
+| Model | `claude-opus-5-5` (Anthropic): 691 requests; tokens: 1,424 input, 499,150 output, 138,286,111 cache read, 1,626,790 cache write; $49.46 at API list prices |
+| API-equivalent cost | $130.14 (estimate; see tools/session_stats.py) |
+
+Asked: expose Dawn's SharedTextureMemory and SharedFence through wgpudawn, in
+the way the project binds native-only things, with tests on native builds,
+then push to `main` and cut a release. (The same session first used a side
+binding of those functions with ctypes against a shared Dawn, which is what
+showed that the API was worth having in the package.)
+
+* `tools/gen_cdef.py`'s native-extra mode now takes handles, enums, structs,
+  functions and enum members, and writes a chained struct's sType and the
+  feature names as `static const int X = value;`. cffi checks such a value
+  against the real header when the extension is built (a wrong value fails
+  the compile), so the constants are verified like everything else and carry
+  their values. `codegen/hparser.py` reads them, so `python codegen` writes
+  Dawn's native feature names into `_mappings.py` in the generator's own
+  spelling (`shared-texture-memory-i-o-surface`, like
+  `texture-compression-b-c`). Commits 07384d3, 0f38f0c, daaefba.
+* `wgpudawn.backends.dawn.extras`: `import_shared_texture_memory()`,
+  `GPUSharedTextureMemory` (properties, `create_texture()` with view formats,
+  `begin_access()` / `end_access()`), `GPUSharedFence` (`type`, `export()`)
+  and `import_shared_fence()`. Memory imported as a dmabuf tracks the Vulkan
+  image layout itself: Dawn's Vulkan backend rejects a begin or end access
+  without the layout chain, and reports the layout a pass left the image in
+  (`COLOR_ATTACHMENT_OPTIMAL`, not the `GENERAL` that was asked for).
+* `tests/test_dawn_extras.py` makes the memory with ctypes (an IOSurface
+  through CoreFoundation, a GBM buffer on the first render node), renders
+  into it, waits on the exported fences and reads the pixels back through
+  the other API; it skips where the platform, the adapter or the libraries
+  lack it. Checked on Apple silicon (Metal: IOSurface, MTLSharedEvent) and on
+  an Intel Iris Xe (Vulkan: dmabuf, sync fd).
+* Two things found by the tests: the first access of uninitialized memory
+  can export two fences (Dawn's lazy clear and the pass), and a `GPUSharedFence`
+  owns its fd, so a caller that keeps only the exported fd and drops the
+  fence polls a closed descriptor, which `poll()` reports at once as
+  `POLLNVAL`. The test asserts `POLLIN`.
+* Not done: `required_features` of `preconfigure_default_device()` still
+  validates against the IDL enum, so the native names go in
+  `preferred_features` there (the README says so); and the conda-forge
+  Dawn, which the local builds used, has no SPIR-V reader, so
+  `test_compute_0_1_spirv` fails locally on `main` as before. The wheels
+  build Dawn with it.
+* CI: run 40089683894 on main; every build and test job green at once, the
+  Website job once failed on `feature_demo/helpers_stats` (the checker's
+  transient class, a page that did not respond; `validate_ndc` the same, and
+  it passed on its retry) and was green on the rerun. Release 0.32.0.0, the
+  first under the X.Y.Z.N scheme: tag run 40091430614, eight files on PyPI
+  with the hashes of the run's artifacts, a clean install outside the
+  checkout, the extras tests passing on the published wheels on macOS and
+  Linux, and the release notes written.
 
 ## 2026-10-17 - light_view with an imgui panel
 
