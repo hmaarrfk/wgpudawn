@@ -142,11 +142,14 @@ What there is:
   `import_shared_texture_memory()` makes a `GPUSharedTextureMemory` from
   memory that another API or process owns (an IOSurface on macOS; a dmabuf,
   or Vulkan memory exported as an opaque fd by another Vulkan program or by
-  CUDA, on Linux). `create_texture()` on it gives a texture to render into between
+  CUDA, on Linux; a D3D11/D3D12 texture shared as an NT handle, an
+  `ID3D12Resource` or an `ID3D11Texture2D`, on Windows). `create_texture()` on it gives a texture to render into between
   `begin_access()` and `end_access()`. The `GPUSharedFence` objects that
   `end_access()` returns export what to wait for (an `MTLSharedEvent` and its
-  value, a sync fd, or an opaque-fd semaphore); `import_shared_fence()` goes
-  the other way. Features: `shared-texture-memory-i-o-surface`,
+  value, a sync fd, an opaque-fd semaphore, or a shared `ID3D12Fence` /
+  `ID3D11Fence` handle); `import_shared_fence()` goes the other way.
+  `import_shared_buffer_memory()` does the same for buffers on Windows (a
+  D3D12 resource, a shared memory handle, or host memory). Features: `shared-texture-memory-i-o-surface`,
   `shared-texture-memory-dma-buf`, `shared-fence-m-t-l-shared-event`,
   `shared-texture-memory-opaque-f-d`, `shared-fence-sync-f-d`,
   `shared-fence-vk-semaphore-opaque-f-d`.
@@ -164,7 +167,11 @@ What there is:
   `skip_validation`), `get_toggles()` says which an adapter or device has;
   `get_memory_usage()`, `reduce_memory_usage()`, `perform_idle_tasks()`;
   on Vulkan, `get_vk_instance()` and `get_vk_instance_proc_addr()` let
-  another library make Vulkan calls on Dawn's instance.
+  another library make Vulkan calls on Dawn's instance; on Windows,
+  `get_d3d12_device()`, `get_d3d12_command_queue()`, `get_d3d11_device()`
+  and `get_dxgi_adapter()` give the native objects (e.g. to make a D3D11
+  device on Dawn's GPU); on macOS, `wait_for_commands_to_be_scheduled()`
+  orders Dawn's work before Core Animation's or another Metal device's.
 
 * **What the backend says about the GPU.** `get_adapter_properties()`: the
   Vulkan driver version and device/driver UUIDs (the UUID by which CUDA,
@@ -194,11 +201,10 @@ What there is:
   It is bound with `{"external_texture": {}}` in the bind group layout.
 
 What Dawn has that could come next (Dawn's `dawn/webgpu.h` and
-`dawn/native/*Backend.h`): shared texture memory on Windows (D3D12 resources, D3D11 textures, DXGI shared handles), from EGL
-images and Android hardware buffers; shared buffer memory (Windows);
-the native
-`ID3D12Device`, `ID3D11Device` and `MTLDevice`; pixel local storage,
-framebuffer fetch. They are added one at a time, each with a test against the
+`dawn/native/*Backend.h`): shared texture memory from EGL images and
+Android hardware buffers (no Android or OpenGL build yet); the `MTLDevice`
+(declared for Objective-C only); pixel local storage, framebuffer fetch,
+resource tables. They are added one at a time, each with a test against the
 real other API (the `dawn-extra` skill).
 
 ## Platforms

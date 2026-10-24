@@ -57,11 +57,13 @@ def make_cdef(header, cc="cc"):
 NATIVE_EXTRA_HANDLES = [  # typedef struct XImpl* X;
     "WGPUSharedTextureMemory",
     "WGPUSharedFence",
+    "WGPUSharedBufferMemory",
 ]
 # Callback types: the typedef, and one extern "Python" function of that type,
 # _wgpu_dawn_native_<name> (extras.py defines it)
 NATIVE_EXTRA_CALLBACKS = [
     "WGPUCallback",
+    "WGPUDisposeCallback",
 ]
 NATIVE_EXTRA_FLAGS = [  # typedef WGPUFlags X; and its constants
     "WGPUHeapProperty",
@@ -69,6 +71,7 @@ NATIVE_EXTRA_FLAGS = [  # typedef WGPUFlags X; and its constants
 NATIVE_EXTRA_ENUMS = [
     "WGPUSharedFenceType",
     "WGPUExternalTextureRotation",
+    "WGPUCallbackStatus",
 ]
 NATIVE_EXTRA_STRUCTS = [
     "WGPUSurfaceSourceXlibWindow",
@@ -94,6 +97,17 @@ NATIVE_EXTRA_STRUCTS = [
     "WGPUSharedFenceSyncFDExportInfo",
     "WGPUSharedFenceVkSemaphoreOpaqueFDDescriptor",
     "WGPUSharedFenceVkSemaphoreOpaqueFDExportInfo",
+    # Windows
+    "WGPUSharedTextureMemoryDXGISharedHandleDescriptor",
+    "WGPUSharedFenceDXGISharedHandleDescriptor",
+    "WGPUSharedFenceDXGISharedHandleExportInfo",
+    "WGPUDisposeCallbackInfo",
+    "WGPUSharedBufferMemoryDescriptor",
+    "WGPUSharedBufferMemoryProperties",
+    "WGPUSharedBufferMemoryBeginAccessDescriptor",
+    "WGPUSharedBufferMemoryEndAccessState",
+    "WGPUSharedBufferMemoryFromWindowsHandleDescriptor",
+    "WGPUSharedBufferMemoryHostPointerDescriptor",
     "WGPUDawnTogglesDescriptor",
     "WGPUAdapterPropertiesDrm",
     "WGPUAdapterPropertiesVk",
@@ -128,10 +142,21 @@ NATIVE_EXTRA_FUNCTIONS = [
     "wgpuDawnDrmFormatCapabilitiesFreeMembers",
     "wgpuDeviceTick",
     "wgpuDeviceCreateExternalTexture",
+    "wgpuDeviceImportSharedBufferMemory",
+    "wgpuSharedBufferMemoryGetProperties",
+    "wgpuSharedBufferMemoryCreateBuffer",
+    "wgpuSharedBufferMemoryBeginAccess",
+    "wgpuSharedBufferMemoryEndAccess",
+    "wgpuSharedBufferMemoryEndAccessStateFreeMembers",
+    "wgpuSharedBufferMemoryIsDeviceLost",
+    "wgpuSharedBufferMemoryRelease",
 ]
 NATIVE_EXTRA_ENUM_MEMBERS = [  # of enums that the shared cdef has
-    # Its struct is in dawn/native/VulkanBackend.h (see dawn_native_cdef.h)
+    # Their structs are in dawn/native/*Backend.h (see dawn_native.cpp)
     "WGPUSType_AdapterPropertiesVulkanUUIDs",
+    "WGPUSType_SharedTextureMemoryD3D12ResourceDescriptor",
+    "WGPUSType_SharedTextureMemoryD3D11Texture2DDescriptor",
+    "WGPUSType_SharedBufferMemoryD3D12ResourceDescriptor",
 ]
 # Enums of the shared cdef of which every native-only member is added: all of
 # Dawn's features, so that adapters and devices list them in ``features``.
@@ -164,10 +189,6 @@ def make_native_extra_cdef(native_header, shared_header, cc="cc"):
     lines = []
     for name in NATIVE_EXTRA_HANDLES:
         lines.append(f"typedef struct {name}Impl* {name};")
-    for name in NATIVE_EXTRA_CALLBACKS:
-        m = _find(r"^typedef void \(\*%s\)\((.*?)\)\s*;" % name, text, name)
-        lines.append(" ".join(m.group(0).split()))
-        lines.append(f'extern "Python" void _wgpu_dawn_native_{name}({m.group(1)});')
     for name in NATIVE_EXTRA_FLAGS:
         _find(r"^typedef WGPUFlags %s;" % name, text, name)
         lines.append(f"typedef WGPUFlags {name};")
@@ -180,6 +201,10 @@ def make_native_extra_cdef(native_header, shared_header, cc="cc"):
     for name in NATIVE_EXTRA_ENUMS:
         m = _find(r"^typedef enum %s \{.*?^\} %s\s*;" % (name, name), text, name)
         lines.append(m.group(0))
+    for name in NATIVE_EXTRA_CALLBACKS:
+        m = _find(r"^typedef void \(\*%s\)\((.*?)\)\s*;" % name, text, name)
+        lines.append(" ".join(m.group(0).split()))
+        lines.append(f'extern "Python" void _wgpu_dawn_native_{name}({m.group(1)});')
     for name in NATIVE_EXTRA_STRUCTS:
         m = _find(r"^typedef struct %s \{.*?^\} %s\s*;" % (name, name), text, name)
         lines.append(m.group(0))

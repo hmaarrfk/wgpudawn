@@ -76,7 +76,7 @@ def get_adapter_properties(adapter: GPUAdapter):
       ``adapter-properties-drm``, Linux). Memory to import as a dmabuf is
       allocated on this render node (e.g. with GBM);
     * ``"d3d"``: ``{"shader_model", "luid"}``, the LUID as an int (feature
-      ``adapter-properties-d3d``, Windows);
+      ``adapter-properties-d-3d``, Windows);
     * ``"memory_heaps"``: a list of ``{"size", "properties"}`` (feature
       ``adapter-properties-memory-heaps``), with properties such as
       ``"device-local"`` and ``"host-visible"``;
@@ -118,7 +118,7 @@ def get_adapter_properties(adapter: GPUAdapter):
                 "primary_node": primary and _dri_node(*primary, "card"),
                 "render_node": render and _dri_node(*render, "renderD"),
             }
-    if "adapter-properties-d3d" in features:
+    if "adapter-properties-d-3d" in features:
         d3d = _get_info(
             adapter, "WGPUAdapterPropertiesD3D", lib.WGPUSType_AdapterPropertiesD3D
         )

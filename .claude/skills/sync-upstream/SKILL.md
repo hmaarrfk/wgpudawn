@@ -60,6 +60,14 @@ The source of each file, and how to carry a change over:
 
 Rules:
 
+* Some differences in `_api.py` are deliberate, for Dawn's extras or because
+  wgpu-py's backend gets WebGPU wrong there; keep them when porting:
+  Dawn's toggles chained on adapter and device requests (`new_toggles_struct`)
+  and the backend filter of `set_instance_extras`; external textures in bind
+  group layouts and bind groups (`GPUExternalTexture`); the `aspect` of
+  texture copies and of `write_texture` (wgpu-py always uses "all"); a view
+  of one aspect without a format leaves the format to Dawn (wgpu-py uses the
+  texture's, which is invalid for depth-stencil aspects and planes).
 * Keep the diff with wgpu-py small: do not reformat, rename or "improve"
   ported code. That is what keeps the next sync cheap.
 * When Dawn behaves differently and both behaviors are valid WebGPU, keep

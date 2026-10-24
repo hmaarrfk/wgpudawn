@@ -583,3 +583,98 @@ def test_dma_buf_nv12_to_rgb():
     full_uv = np.repeat(np.repeat(uv / 255, 2, 0), 2, 1)
     yuv = np.concatenate([y[..., None] / 255, full_uv, np.ones((h, w, 1))], -1)
     assert np.abs(rgb - yuv @ m.T).max() < 1e-3
+
+
+# --- Windows: D3D11 textures shared as NT handles ----------------------------
+
+DXGI_MEMORY = "shared-texture-memory-d-x-g-i-shared-handle"
+DXGI_FENCE = "shared-fence-d-x-g-i-shared-handle"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="DXGI is Windows")
+def test_dxgi_shared_handle_round_trip():
+    # D3D11, on Dawn's own DXGI adapter, makes a green texture and shares it
+    # as an NT handle; Dawn reads green, clears it red, and D3D11 reads red.
+    if not can_use_wgpu_lib:
+        pytest.skip("Needs wgpu lib")
+    adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
+    if adapter.info["backend_type"] not in ("D3D12", "D3D11"):
+        pytest.skip("Not a D3D adapter")
+    features = [f for f in (DXGI_MEMORY, DXGI_FENCE) if f in adapter.features]
+    if DXGI_MEMORY not in features:
+        pytest.skip(f"Adapter lacks {DXGI_MEMORY}")
+    dxgi_adapter = extras.get_dxgi_adapter(adapter)
+    assert dxgi_adapter
+    device = adapter.request_device_sync(required_features=features)
+    if adapter.info["backend_type"] == "D3D12":
+        assert extras.get_d3d12_device(device)
+        assert extras.get_d3d12_command_queue(device)
+    else:
+        assert extras.get_d3d11_device(device)
+    import d3dutils
+
+    d3d = d3dutils.D3D11Device(dxgi_adapter)
+    green = np.zeros((HEIGHT, WIDTH, 4), np.uint8)
+    green[...] = [0, 255, 0, 255]
+    texture11, handle = d3d.create_shared_texture(green)
+    try:
+        memory = extras.import_shared_texture_memory(device, dxgi_shared_handle=handle)
+        assert memory.properties["format"] == "rgba8unorm"
+        assert memory.properties["size"] == (WIDTH, HEIGHT, 1)
+        texture = memory.create_texture()
+
+        memory.begin_access(texture, initialized=True)
+        data = device.queue.read_texture(
+            {"texture": texture}, {"bytes_per_row": WIDTH * 4}, (WIDTH, HEIGHT, 1)
+        )
+        assert (np.frombuffer(data, np.uint8).reshape(HEIGHT, WIDTH, 4) == green).all()
+        _clear_to(device, texture, (1.0, 0.0, 0.0, 1.0))
+        state = memory.end_access(texture)
+        for fence in state.fences:
+            info = fence.export()
+            assert info["type"] == "dxgi-shared-handle" and info["handle"]
+        device.queue.on_submitted_work_done_sync()
+        assert (d3d.pixels(texture11, WIDTH, HEIGHT) == [255, 0, 0, 255]).all()
+
+        if state.fences:
+            # The exported fence goes back in as a fence of "another API"
+            info = state.fences[0].export()
+            fence = extras.import_shared_fence(
+                device, dxgi_shared_handle=info["handle"]
+            )
+            assert fence.type == "dxgi-shared-handle"
+            memory.begin_access(
+                texture, fences=[fence], signaled_values=state.signaled_values[:1]
+            )
+            memory.end_access(texture)
+        del texture, memory
+    finally:
+        device.queue.on_submitted_work_done_sync()
+        d3d.close_handle(handle)
+        d3dutils.release(texture11)
+        d3d.close()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="D3D12 is Windows")
+def test_shared_buffer_memory_of_host_memory():
+    # Integrated GPUs (and WARP) on D3D12: memory of this process as a buffer
+    if not can_use_wgpu_lib:
+        pytest.skip("Needs wgpu lib")
+    adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
+    feature = "shared-buffer-memory-host-pointer"
+    if feature not in adapter.features:
+        pytest.skip(f"Adapter lacks {feature}")
+    device = adapter.request_device_sync(required_features=[feature])
+    import mmap
+
+    pages = mmap.mmap(-1, 65536)
+    host = memoryview(pages)
+    array = np.frombuffer(host, np.uint32)
+    array[:] = np.arange(array.size)
+    memory = extras.import_shared_buffer_memory(device, host_memory=host)
+    assert memory.properties["size"] == 65536
+    buffer = memory.create_buffer()
+    memory.begin_access(buffer, initialized=True)
+    data = device.queue.read_buffer(buffer)
+    memory.end_access(buffer)
+    assert (np.frombuffer(data, np.uint32) == np.arange(array.size)).all()

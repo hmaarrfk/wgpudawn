@@ -97,6 +97,34 @@ Dawn has three layers, and an extra may need any of them:
   A compile error here means the cdef and the header disagree; fix the list,
   never hand-edit the generated cdef.
 
+Things that have bitten before:
+
+* Feature names are codegen's kebab case of Dawn's names, e.g.
+  `adapter-properties-d-3d`, `shared-texture-memory-d-x-g-i-shared-handle`,
+  not what you would guess (`...-d3d`): an extra that checks a misspelt name
+  silently does nothing. `test_feature_names_of_the_extras_exist` checks the
+  names in docstrings and `"..." in features`; look names up in
+  `_mappings.py`.
+* A struct of `dawn/native/*Backend.h` derives from `wgpu::ChainedStruct(Out)`:
+  do not mirror it as a C struct. The Itanium ABI puts members in the tail
+  padding of the base (offset 12, not 16), MSVC does not. Declare a struct
+  derived the same way in `dawn_native.cpp` (or use Dawn's header) and copy
+  out in C++.
+* Structs that hold a `ComPtr` (the D3D12/D3D11 descriptors) can only be
+  filled in C++: import through a C function in `dawn_native.cpp`.
+* Dawn hides experimental features (`feature_info()` says which) unless the
+  instance has `allow_unsafe_apis`; test them in a subprocess with
+  `set_instance_extras`, since the instance is process-wide.
+* An adapter makes one device; request a new adapter for each device.
+* Writing a dmabuf through a plain `mmap` is not coherent with the GPU
+  everywhere (the GPU read zeros, differently each run); write through the
+  allocator's map (`gbm_bo_map`), which the tests do.
+* Host memory for Metal and D3D12 must be pages of its own (`mmap`), not part
+  of a `malloc` block: those lose the device.
+* Windows and macOS are only tested on CI: WARP (D3D12 and D3D11) on the
+  Windows runners, Apple's paravirtual GPU on the macOS ones. The CI step
+  "Show adapters" prints each adapter's features.
+
 ## 3. Implement, test, document
 
 * `extras.py`: the API of the rules above, with docstrings that say the

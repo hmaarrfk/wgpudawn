@@ -265,12 +265,33 @@ def test_write_timestamp():
 # %% Adapter properties and format capabilities
 
 
+def test_feature_names_of_the_extras_exist():
+    # The extras ask adapters for features by name; a misspelt one is never
+    # there, and its extra silently does nothing
+    import re
+    from wgpudawn.backends.dawn import _extras_adapter, _extras_memory
+    from wgpudawn.backends.dawn._mappings import enum_str2int, enummap
+
+    names = set(enum_str2int["FeatureName"])
+    names |= {k.split(".", 1)[1] for k in enummap if k.startswith("FeatureName.")}
+    for module in (extras, _extras_adapter, _extras_memory):
+        source = open(module.__file__).read()
+        for name in re.findall(r"``([a-z0-9-]+)``", source) + re.findall(
+            r'"([a-z0-9]+(?:-[a-z0-9]+)+)" (?:in|not in) ', source
+        ):
+            if name.startswith(("shared-", "adapter-properties-", "dawn-")) or name in (
+                "host-mapped-pointer",
+                "chromium-experimental-subgroup-matrix",
+            ):
+                assert name in names, f"{module.__name__}: unknown feature {name}"
+
+
 def test_adapter_properties():
     adapter = wgpu.gpu.request_adapter_sync()
     properties = extras.get_adapter_properties(adapter)
     features = adapter.features
     assert ("vk" in properties) == ("adapter-properties-vk" in features)
-    assert ("d3d" in properties) == ("adapter-properties-d3d" in features)
+    assert ("d3d" in properties) == ("adapter-properties-d-3d" in features)
     if "adapter-properties-memory-heaps" in features:
         heaps = properties["memory_heaps"]
         assert heaps and all(h["size"] > 0 for h in heaps)

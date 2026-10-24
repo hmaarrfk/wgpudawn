@@ -150,3 +150,131 @@ static void* wgpu_dawn_vk_get_instance_proc_addr(WGPUDevice device, const char* 
   return nullptr;
 #endif
 }
+
+// ---- Windows: D3D12 and D3D11 (the backend headers need the Windows SDK) ----
+
+#if defined(_WIN32) && __has_include(<dawn/native/D3D12Backend.h>)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <dawn/native/D3D12Backend.h>
+#define WGPU_DAWN_HAS_D3D12 1
+#endif
+#if defined(_WIN32) && __has_include(<dawn/native/D3D11Backend.h>)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <dawn/native/D3D11Backend.h>
+#define WGPU_DAWN_HAS_D3D11 1
+#endif
+
+// The native objects are owned by Dawn; these return them without a reference
+// of their own (valid while the device or adapter lives). The caller checks
+// that the device is of the right backend: Dawn casts it.
+static void* wgpu_dawn_d3d12_device(WGPUDevice device) {
+#ifdef WGPU_DAWN_HAS_D3D12
+  return dawn::native::d3d12::GetD3D12Device(device).Get();
+#else
+  (void)device;
+  return nullptr;
+#endif
+}
+
+static void* wgpu_dawn_d3d12_command_queue(WGPUDevice device) {
+#ifdef WGPU_DAWN_HAS_D3D12
+  return dawn::native::d3d12::GetD3D12CommandQueue(device).Get();
+#else
+  (void)device;
+  return nullptr;
+#endif
+}
+
+static void* wgpu_dawn_d3d11_device(WGPUDevice device) {
+#ifdef WGPU_DAWN_HAS_D3D11
+  return dawn::native::d3d11::GetD3D11Device(device).Get();
+#else
+  (void)device;
+  return nullptr;
+#endif
+}
+
+static void* wgpu_dawn_dxgi_adapter(WGPUAdapter adapter) {
+#if defined(WGPU_DAWN_HAS_D3D12) || defined(WGPU_DAWN_HAS_D3D11)
+  return dawn::native::d3d::GetDXGIAdapter(adapter).Get();
+#else
+  (void)adapter;
+  return nullptr;
+#endif
+}
+
+// Import an ID3D12Resource (a texture or a buffer) or an ID3D11Texture2D,
+// made on the device's own ID3D12Device / ID3D11Device. The descriptors of
+// these hold a ComPtr, so they are only available in C++. NULL without them.
+static WGPUSharedTextureMemory wgpu_dawn_import_d3d12_texture(
+    WGPUDevice device, void* resource, const char* label) {
+#ifdef WGPU_DAWN_HAS_D3D12
+  dawn::native::d3d12::SharedTextureMemoryD3D12ResourceDescriptor d3d;
+  d3d.resource = static_cast<ID3D12Resource*>(resource);
+  WGPUSharedTextureMemoryDescriptor desc = WGPU_SHARED_TEXTURE_MEMORY_DESCRIPTOR_INIT;
+  desc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(static_cast<wgpu::ChainedStruct*>(&d3d));
+  desc.label = {label, WGPU_STRLEN};
+  return wgpuDeviceImportSharedTextureMemory(device, &desc);
+#else
+  (void)device;
+  (void)resource;
+  (void)label;
+  return nullptr;
+#endif
+}
+
+static WGPUSharedBufferMemory wgpu_dawn_import_d3d12_buffer(
+    WGPUDevice device, void* resource, const char* label) {
+#ifdef WGPU_DAWN_HAS_D3D12
+  dawn::native::d3d12::SharedBufferMemoryD3D12ResourceDescriptor d3d;
+  d3d.resource = static_cast<ID3D12Resource*>(resource);
+  WGPUSharedBufferMemoryDescriptor desc = WGPU_SHARED_BUFFER_MEMORY_DESCRIPTOR_INIT;
+  desc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(static_cast<wgpu::ChainedStruct*>(&d3d));
+  desc.label = {label, WGPU_STRLEN};
+  return wgpuDeviceImportSharedBufferMemory(device, &desc);
+#else
+  (void)device;
+  (void)resource;
+  (void)label;
+  return nullptr;
+#endif
+}
+
+static WGPUSharedTextureMemory wgpu_dawn_import_d3d11_texture(
+    WGPUDevice device, void* texture, const char* label) {
+#ifdef WGPU_DAWN_HAS_D3D11
+  dawn::native::d3d11::SharedTextureMemoryD3D11Texture2DDescriptor d3d;
+  d3d.texture = static_cast<ID3D11Texture2D*>(texture);
+  WGPUSharedTextureMemoryDescriptor desc = WGPU_SHARED_TEXTURE_MEMORY_DESCRIPTOR_INIT;
+  desc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(static_cast<wgpu::ChainedStruct*>(&d3d));
+  desc.label = {label, WGPU_STRLEN};
+  return wgpuDeviceImportSharedTextureMemory(device, &desc);
+#else
+  (void)device;
+  (void)texture;
+  (void)label;
+  return nullptr;
+#endif
+}
+
+// ---- macOS: Metal ----
+
+#if defined(__APPLE__)
+namespace dawn::native::metal {
+DAWN_NATIVE_EXPORT void WaitForCommandsToBeScheduled(WGPUDevice device);
+}  // namespace dawn::native::metal
+#endif
+
+// Wait until the submitted work of a Metal device is scheduled, so that
+// another API (or Core Animation) that uses shared memory afterwards sees it.
+static void wgpu_dawn_metal_wait_for_commands_to_be_scheduled(WGPUDevice device) {
+#if defined(__APPLE__)
+  dawn::native::metal::WaitForCommandsToBeScheduled(device);
+#else
+  (void)device;
+#endif
+}

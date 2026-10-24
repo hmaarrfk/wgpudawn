@@ -316,3 +316,48 @@ def get_vk_instance_proc_addr(device: GPUDevice, name: str):
         device._internal, ffi.new("char[]", name.encode())
     )
     return int(ffi.cast("uintptr_t", ptr))
+
+
+def _native_pointer(function_name, handle):
+    ptr = _native(function_name)(handle)
+    return int(ffi.cast("uintptr_t", ptr))
+
+
+def get_d3d12_device(device: GPUDevice):
+    """The ``ID3D12Device *`` of a D3D12 device, as an int (Windows). It is
+    owned by Dawn: valid while the device lives (``AddRef`` it to keep it)."""
+    _check_backend(device, "D3D12")
+    return _native_pointer("wgpu_dawn_d3d12_device", device._internal)
+
+
+def get_d3d12_command_queue(device: GPUDevice):
+    """The ``ID3D12CommandQueue *`` that Dawn submits to, as an int (Windows),
+    e.g. to make another API wait for Dawn's work. Owned by Dawn."""
+    _check_backend(device, "D3D12")
+    return _native_pointer("wgpu_dawn_d3d12_command_queue", device._internal)
+
+
+def get_d3d11_device(device: GPUDevice):
+    """The ``ID3D11Device *`` of a D3D11 device, as an int (Windows). Owned
+    by Dawn."""
+    _check_backend(device, "D3D11")
+    return _native_pointer("wgpu_dawn_d3d11_device", device._internal)
+
+
+def get_dxgi_adapter(adapter: GPUAdapter):
+    """The ``IDXGIAdapter *`` of a D3D12 or D3D11 adapter, as an int
+    (Windows), e.g. to make a device of another API on the same GPU. Owned by
+    Dawn."""
+    if adapter.info["backend_type"] not in ("D3D12", "D3D11"):
+        raise RuntimeError(
+            f"The adapter is not a D3D adapter ({adapter.info['backend_type']})"
+        )
+    return _native_pointer("wgpu_dawn_dxgi_adapter", adapter._internal)
+
+
+def wait_for_commands_to_be_scheduled(device: GPUDevice):
+    """Metal: wait until the work submitted so far is scheduled on the GPU, so
+    that another Metal device or Core Animation that uses shared memory (an
+    IOSurface) afterwards is ordered after it. Does nothing elsewhere."""
+    if device.adapter.info["backend_type"] == "Metal":
+        _native("wgpu_dawn_metal_wait_for_commands_to_be_scheduled")(device._internal)

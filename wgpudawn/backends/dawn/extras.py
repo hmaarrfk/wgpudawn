@@ -54,6 +54,11 @@ from ._extras_util import _native, _check_status
 from ._extras_device import (
     all_toggles,
     feature_info,
+    get_d3d11_device,
+    get_d3d12_command_queue,
+    get_d3d12_device,
+    get_dxgi_adapter,
+    wait_for_commands_to_be_scheduled,
     get_memory_usage,
     get_toggles,
     get_vk_instance,
@@ -65,6 +70,11 @@ from ._extras_device import (
     set_instance_extras,
 )
 from ._extras_adapter import get_adapter_properties, get_format_capabilities
+from ._extras_buffer import (
+    GPUSharedBufferMemory,
+    SharedBufferMemoryEndAccessState,
+    import_shared_buffer_memory,
+)
 from ._extras_video import create_external_texture, get_yuv_to_rgb_matrix
 from ._extras_memory import (
     allocate_host_memory,
@@ -81,8 +91,10 @@ from ._extras_draw import (
 )
 
 __all__ = [
+    "GPUSharedBufferMemory",
     "GPUSharedFence",
     "GPUSharedTextureMemory",
+    "SharedBufferMemoryEndAccessState",
     "SharedTextureMemoryEndAccessState",
     "all_toggles",
     "allocate_host_memory",
@@ -90,6 +102,10 @@ __all__ = [
     "create_external_texture",
     "feature_info",
     "get_adapter_properties",
+    "get_d3d11_device",
+    "get_d3d12_command_queue",
+    "get_d3d12_device",
+    "get_dxgi_adapter",
     "get_format_capabilities",
     "get_host_memory_alignment",
     "get_memory_usage",
@@ -97,6 +113,7 @@ __all__ = [
     "get_vk_instance",
     "get_vk_instance_proc_addr",
     "get_yuv_to_rgb_matrix",
+    "import_shared_buffer_memory",
     "import_shared_fence",
     "import_shared_texture_memory",
     "multi_draw_indexed_indirect",
@@ -109,6 +126,7 @@ __all__ = [
     "request_device",
     "request_device_sync",
     "set_instance_extras",
+    "wait_for_commands_to_be_scheduled",
     "write_timestamp",
 ]
 
@@ -117,6 +135,7 @@ _fence_types = {
     "VkSemaphoreOpaqueFD": "vk-semaphore-opaque-fd",
     "SyncFD": "sync-fd",
     "MTLSharedEvent": "mtl-shared-event",
+    "DXGISharedHandle": "dxgi-shared-handle",
 }
 
 
@@ -134,7 +153,11 @@ def import_shared_texture_memory(
     io_surface=None,
     dma_buf=None,
     opaque_fd=None,
+    dxgi_shared_handle=None,
+    d3d12_resource=None,
+    d3d11_texture=None,
     allow_storage_binding=False,
+    use_keyed_mutex=False,
 ):
     """Import externally allocated memory as a :class:`GPUSharedTextureMemory`.
 
@@ -152,15 +175,48 @@ def import_shared_texture_memory(
             ``VkExternalMemoryImageCreateInfo`` for opaque fds chained, and
             ``VK_IMAGE_USAGE_TRANSFER_DST_BIT`` in its usage): Dawn makes the
             same image on the memory. Feature ``shared-texture-memory-opaque-f-d``.
+        dxgi_shared_handle (int): Windows: the NT handle of a shared D3D11 or
+            D3D12 texture (``IDXGIResource1::CreateSharedHandle``), from any
+            device or process on the same GPU. Feature
+            ``shared-texture-memory-d-x-g-i-shared-handle``.
+        d3d12_resource (int): Windows: an ``ID3D12Resource *`` made on the
+            device's own ``ID3D12Device`` (:func:`get_d3d12_device`). Feature
+            ``shared-texture-memory-d-3d12-resource``.
+        d3d11_texture (int): Windows: an ``ID3D11Texture2D *`` made on the
+            device's own ``ID3D11Device`` (:func:`get_d3d11_device`, D3D11
+            backend). Feature ``shared-texture-memory-d-3d11-texture-2d``.
         allow_storage_binding (bool): IOSurface only: allow the ``STORAGE_BINDING``
             usage (writing from compute shaders), if the surface's format permits it.
+        use_keyed_mutex (bool): DXGI shared handle only: synchronize with the
+            texture's keyed mutex (when it was made with one).
 
-    Exactly one of ``io_surface``, ``dma_buf`` and ``opaque_fd`` must be given.
-    The memory keeps a reference to the handle (an IOSurface is retained; the
-    fds are duplicated), so the caller's can be released afterwards.
+    Exactly one source must be given. The memory keeps a reference to the
+    handle (an IOSurface or a COM object is retained; fds and NT handles are
+    duplicated), so the caller's can be released afterwards.
     """
-    if sum(x is not None for x in (io_surface, dma_buf, opaque_fd)) != 1:
-        raise TypeError("Give exactly one of io_surface, dma_buf and opaque_fd")
+    sources = (io_surface, dma_buf, opaque_fd, dxgi_shared_handle)
+    sources += (d3d12_resource, d3d11_texture)
+    if sum(x is not None for x in sources) != 1:
+        raise TypeError(
+            "Give exactly one of io_surface, dma_buf, opaque_fd, "
+            "dxgi_shared_handle, d3d12_resource and d3d11_texture"
+        )
+    if d3d12_resource is not None or d3d11_texture is not None:
+        # Their descriptors hold a ComPtr: imported by C++ (dawn_native.cpp)
+        if d3d12_resource is not None:
+            function = _native("wgpu_dawn_import_d3d12_texture")
+            pointer = d3d12_resource
+        else:
+            function = _native("wgpu_dawn_import_d3d11_texture")
+            pointer = d3d11_texture
+        id = function(
+            device._internal,
+            ffi.cast("void *", int(pointer)),
+            ffi.new("char[]", label.encode()),
+        )
+        if id == ffi.NULL:
+            raise RuntimeError("Importing the D3D object failed (not on Windows?)")
+        return GPUSharedTextureMemory(label, id, device)
     if io_surface is not None:
         chained = new_struct_p(
             "WGPUSharedTextureMemoryIOSurfaceDescriptor *",
@@ -180,6 +236,15 @@ def import_shared_texture_memory(
             dedicatedAllocation=bool(opaque_fd.get("dedicated_allocation", False)),
         )
         chained.chain.sType = lib.WGPUSType_SharedTextureMemoryOpaqueFDDescriptor
+    elif dxgi_shared_handle is not None:
+        chained = new_struct_p(
+            "WGPUSharedTextureMemoryDXGISharedHandleDescriptor *",
+            handle=ffi.cast("void *", int(dxgi_shared_handle)),
+            useKeyedMutex=bool(use_keyed_mutex),
+        )
+        chained.chain.sType = (
+            lib.WGPUSType_SharedTextureMemoryDXGISharedHandleDescriptor
+        )
     else:
         planes = ffi.new(
             "WGPUSharedTextureMemoryDmaBufPlane[]", max(len(dma_buf["planes"]), 1)
@@ -223,6 +288,7 @@ def import_shared_fence(
     mtl_shared_event=None,
     sync_fd=None,
     vk_semaphore_opaque_fd=None,
+    dxgi_shared_handle=None,
 ):
     """Import a synchronization object of another API as a :class:`GPUSharedFence`.
 
@@ -232,6 +298,8 @@ def import_shared_fence(
         mtl_shared_event (int): macOS: the ``id<MTLSharedEvent>``, as an integer.
         sync_fd (int): Linux: a sync file descriptor.
         vk_semaphore_opaque_fd (int): Linux: a Vulkan semaphore exported as an opaque fd.
+        dxgi_shared_handle (int): Windows: the NT handle of a shared
+            ``ID3D12Fence`` or ``ID3D11Fence``.
 
     Exactly one of the handles must be given. A fence made this way is passed
     to :meth:`GPUSharedTextureMemory.begin_access` so the GPU waits for it.
@@ -244,15 +312,19 @@ def import_shared_fence(
             "WGPUSharedFenceVkSemaphoreOpaqueFDDescriptor",
             "handle",
         ),
+        (dxgi_shared_handle, "WGPUSharedFenceDXGISharedHandleDescriptor", "handle*"),
     ]
     given = [(value, ctype, key) for value, ctype, key in given if value is not None]
     if len(given) != 1:
         raise TypeError(
-            "Give exactly one of mtl_shared_event, sync_fd and vk_semaphore_opaque_fd"
+            "Give exactly one of mtl_shared_event, sync_fd, "
+            "vk_semaphore_opaque_fd and dxgi_shared_handle"
         )
     value, ctype, key = given[0]
     if key == "sharedEvent":
         chained = new_struct_p(f"{ctype} *", sharedEvent=ffi.cast("void *", int(value)))
+    elif key == "handle*":  # a HANDLE (void *), not an fd
+        chained = new_struct_p(f"{ctype} *", handle=ffi.cast("void *", int(value)))
     else:
         chained = new_struct_p(f"{ctype} *", handle=int(value))
     chained.chain.sType = getattr(lib, "WGPUSType_" + ctype[len("WGPU") :])
@@ -307,7 +379,9 @@ class GPUSharedFence(GPUObjectBase):
         """The fence's handle, as a dict with its ``"type"``.
 
         ``{"type": "mtl-shared-event", "shared_event": <id<MTLSharedEvent> as int>}``,
-        ``{"type": "sync-fd", "fd": <int>}`` or ``{"type": "vk-semaphore-opaque-fd", "fd": <int>}``.
+        ``{"type": "sync-fd", "fd": <int>}``, ``{"type": "vk-semaphore-opaque-fd", "fd": <int>}``
+        or ``{"type": "dxgi-shared-handle", "handle": <HANDLE as int>}`` (open it with
+        ``ID3D12Device::OpenSharedHandle`` or ``ID3D11Device5::OpenSharedFence``).
         The handle stays owned by the fence: the pointer is valid while the fence
         lives (retain it to keep it longer), and an fd must be ``os.dup()``'d
         to outlive it. Waiting is done with the other API: an fd with
@@ -324,6 +398,9 @@ class GPUSharedFence(GPUObjectBase):
         elif kind == "vk-semaphore-opaque-fd":
             chained = new_struct_p("WGPUSharedFenceVkSemaphoreOpaqueFDExportInfo *")
             chained.chain.sType = lib.WGPUSType_SharedFenceVkSemaphoreOpaqueFDExportInfo
+        elif kind == "dxgi-shared-handle":
+            chained = new_struct_p("WGPUSharedFenceDXGISharedHandleExportInfo *")
+            chained.chain.sType = lib.WGPUSType_SharedFenceDXGISharedHandleExportInfo
         else:
             raise RuntimeError(f"Cannot export a fence of type {kind}")
         info = new_struct_p(
@@ -336,6 +413,8 @@ class GPUSharedFence(GPUObjectBase):
                 "type": kind,
                 "shared_event": int(ffi.cast("uintptr_t", chained.sharedEvent)),
             }
+        if kind == "dxgi-shared-handle":
+            return {"type": kind, "handle": int(ffi.cast("uintptr_t", chained.handle))}
         return {"type": kind, "fd": int(chained.handle)}
 
     def _release(self):

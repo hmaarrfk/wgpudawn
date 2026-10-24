@@ -1,7 +1,6 @@
 typedef struct WGPUSharedTextureMemoryImpl* WGPUSharedTextureMemory;
 typedef struct WGPUSharedFenceImpl* WGPUSharedFence;
-typedef void (*WGPUCallback)(void * userdata) ;
-extern "Python" void _wgpu_dawn_native_WGPUCallback(void * userdata);
+typedef struct WGPUSharedBufferMemoryImpl* WGPUSharedBufferMemory;
 typedef WGPUFlags WGPUHeapProperty;
 static const WGPUHeapProperty WGPUHeapProperty_None = 0x0000000000000000;
 static const WGPUHeapProperty WGPUHeapProperty_DeviceLocal = 0x0000000000000001;
@@ -25,6 +24,15 @@ typedef enum WGPUExternalTextureRotation {
     WGPUExternalTextureRotation_Rotate270Degrees = 0x00000004,
     WGPUExternalTextureRotation_Force32 = 0x7FFFFFFF
 } WGPUExternalTextureRotation ;
+typedef enum WGPUCallbackStatus {
+    WGPUCallbackStatus_Success = 0x00000001,
+    WGPUCallbackStatus_Error = 0x00000002,
+    WGPUCallbackStatus_Force32 = 0x7FFFFFFF
+} WGPUCallbackStatus ;
+typedef void (*WGPUCallback)(void * userdata) ;
+extern "Python" void _wgpu_dawn_native_WGPUCallback(void * userdata);
+typedef void (*WGPUDisposeCallback)(WGPUCallbackStatus status, void* userdata1, void* userdata2) ;
+extern "Python" void _wgpu_dawn_native_WGPUDisposeCallback(WGPUCallbackStatus status, void* userdata1, void* userdata2);
 typedef struct WGPUSurfaceSourceXlibWindow {
     WGPUChainedStruct chain;
     void * display;
@@ -155,6 +163,67 @@ typedef struct WGPUSharedFenceVkSemaphoreOpaqueFDExportInfo {
     int handle;
 } WGPUSharedFenceVkSemaphoreOpaqueFDExportInfo ;
 static const int WGPUSType_SharedFenceVkSemaphoreOpaqueFDExportInfo = 0x0005002B;
+typedef struct WGPUSharedTextureMemoryDXGISharedHandleDescriptor {
+    WGPUChainedStruct chain;
+    void * handle;
+    WGPUBool useKeyedMutex;
+} WGPUSharedTextureMemoryDXGISharedHandleDescriptor ;
+static const int WGPUSType_SharedTextureMemoryDXGISharedHandleDescriptor = 0x00050021;
+typedef struct WGPUSharedFenceDXGISharedHandleDescriptor {
+    WGPUChainedStruct chain;
+    void * handle;
+} WGPUSharedFenceDXGISharedHandleDescriptor ;
+static const int WGPUSType_SharedFenceDXGISharedHandleDescriptor = 0x00050030;
+typedef struct WGPUSharedFenceDXGISharedHandleExportInfo {
+    WGPUChainedStruct chain;
+    void * handle;
+} WGPUSharedFenceDXGISharedHandleExportInfo ;
+static const int WGPUSType_SharedFenceDXGISharedHandleExportInfo = 0x00050031;
+typedef struct WGPUDisposeCallbackInfo {
+    WGPUChainedStruct * nextInChain;
+    WGPUCallbackMode mode;
+    WGPUDisposeCallback callback;
+    void* userdata1;
+    void* userdata2;
+} WGPUDisposeCallbackInfo ;
+typedef struct WGPUSharedBufferMemoryDescriptor {
+    WGPUChainedStruct * nextInChain;
+    WGPUStringView label;
+} WGPUSharedBufferMemoryDescriptor ;
+typedef struct WGPUSharedBufferMemoryProperties {
+    WGPUChainedStruct * nextInChain;
+    WGPUBufferUsage usage;
+    uint64_t size;
+} WGPUSharedBufferMemoryProperties ;
+typedef struct WGPUSharedBufferMemoryBeginAccessDescriptor {
+    WGPUChainedStruct * nextInChain;
+    WGPUBool initialized;
+    size_t fenceCount;
+    WGPUSharedFence const * fences;
+    size_t signaledValueCount;
+    uint64_t const * signaledValues;
+} WGPUSharedBufferMemoryBeginAccessDescriptor ;
+typedef struct WGPUSharedBufferMemoryEndAccessState {
+    WGPUChainedStruct * nextInChain;
+    WGPUBool initialized;
+    size_t fenceCount;
+    WGPUSharedFence const * fences;
+    size_t signaledValueCount;
+    uint64_t const * signaledValues;
+} WGPUSharedBufferMemoryEndAccessState ;
+typedef struct WGPUSharedBufferMemoryFromWindowsHandleDescriptor {
+    WGPUChainedStruct chain;
+    void * handle;
+    uint64_t size;
+} WGPUSharedBufferMemoryFromWindowsHandleDescriptor ;
+static const int WGPUSType_SharedBufferMemoryFromWindowsHandleDescriptor = 0x0005004D;
+typedef struct WGPUSharedBufferMemoryHostPointerDescriptor {
+    WGPUChainedStruct chain;
+    void * pointer;
+    uint64_t size;
+    WGPUDisposeCallbackInfo disposeCallbackInfo;
+} WGPUSharedBufferMemoryHostPointerDescriptor ;
+static const int WGPUSType_SharedBufferMemoryHostPointerDescriptor = 0x00050054;
 typedef struct WGPUDawnTogglesDescriptor {
     WGPUChainedStruct chain;
     size_t enabledToggleCount;
@@ -262,7 +331,18 @@ WGPUStatus wgpuAdapterGetFormatCapabilities(WGPUAdapter adapter, WGPUTextureForm
 void wgpuDawnDrmFormatCapabilitiesFreeMembers(WGPUDawnDrmFormatCapabilities dawnDrmFormatCapabilities) ;
 void wgpuDeviceTick(WGPUDevice device) ;
 WGPUExternalTexture wgpuDeviceCreateExternalTexture(WGPUDevice device, WGPUExternalTextureDescriptor const * externalTextureDescriptor) ;
+WGPUSharedBufferMemory wgpuDeviceImportSharedBufferMemory(WGPUDevice device, WGPUSharedBufferMemoryDescriptor const * descriptor) ;
+WGPUStatus wgpuSharedBufferMemoryGetProperties(WGPUSharedBufferMemory sharedBufferMemory, WGPUSharedBufferMemoryProperties * properties) ;
+WGPUBuffer wgpuSharedBufferMemoryCreateBuffer(WGPUSharedBufferMemory sharedBufferMemory, WGPUBufferDescriptor const * descriptor) ;
+WGPUStatus wgpuSharedBufferMemoryBeginAccess(WGPUSharedBufferMemory sharedBufferMemory, WGPUBuffer buffer, WGPUSharedBufferMemoryBeginAccessDescriptor const * descriptor) ;
+WGPUStatus wgpuSharedBufferMemoryEndAccess(WGPUSharedBufferMemory sharedBufferMemory, WGPUBuffer buffer, WGPUSharedBufferMemoryEndAccessState * descriptor) ;
+void wgpuSharedBufferMemoryEndAccessStateFreeMembers(WGPUSharedBufferMemoryEndAccessState sharedBufferMemoryEndAccessState) ;
+WGPUBool wgpuSharedBufferMemoryIsDeviceLost(WGPUSharedBufferMemory sharedBufferMemory) ;
+void wgpuSharedBufferMemoryRelease(WGPUSharedBufferMemory sharedBufferMemory) ;
 static const int WGPUSType_AdapterPropertiesVulkanUUIDs = 0x00050056;
+static const int WGPUSType_SharedTextureMemoryD3D12ResourceDescriptor = 0x0005004E;
+static const int WGPUSType_SharedTextureMemoryD3D11Texture2DDescriptor = 0x00050022;
+static const int WGPUSType_SharedBufferMemoryD3D12ResourceDescriptor = 0x00050034;
 static const int WGPUFeatureName_DawnInternalUsages = 0x00050000;
 static const int WGPUFeatureName_DawnMultiPlanarFormats = 0x00050001;
 static const int WGPUFeatureName_DawnNative = 0x00050002;

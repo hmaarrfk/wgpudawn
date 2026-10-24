@@ -17,3 +17,13 @@ void * wgpu_dawn_vk_get_instance_proc_addr(WGPUDevice device, const char * name)
 // The device and driver UUIDs of a Vulkan adapter (16 bytes each, into out32);
 // returns 0 when Dawn does not give them.
 int wgpu_dawn_vulkan_uuids(WGPUAdapter adapter, uint8_t * out32);
+// D3D12 and D3D11 (Windows; NULL elsewhere)
+void * wgpu_dawn_d3d12_device(WGPUDevice device);
+void * wgpu_dawn_d3d12_command_queue(WGPUDevice device);
+void * wgpu_dawn_d3d11_device(WGPUDevice device);
+void * wgpu_dawn_dxgi_adapter(WGPUAdapter adapter);
+WGPUSharedTextureMemory wgpu_dawn_import_d3d12_texture(WGPUDevice device, void * resource, const char * label);
+WGPUSharedBufferMemory wgpu_dawn_import_d3d12_buffer(WGPUDevice device, void * resource, const char * label);
+WGPUSharedTextureMemory wgpu_dawn_import_d3d11_texture(WGPUDevice device, void * texture, const char * label);
+// Metal (macOS; nothing elsewhere)
+void wgpu_dawn_metal_wait_for_commands_to_be_scheduled(WGPUDevice device);
