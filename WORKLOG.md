@@ -55,6 +55,11 @@ in parentheses.
   extension is built, and a wrong value fails the build. So native-only enum
   members (sTypes, feature names) are written with their values, which is
   what lets codegen read them. (2026-10-24)
+* Test an interop extra against the other API, not only through Dawn: a
+  round trip through Dawn alone passed while the UUIDs were 4 bytes off and
+  the dmabuf test silently used another GPU's node. And a check that compares
+  two falses passes for the wrong reason: test that the names you test for
+  exist. (2026-10-24)
 * A fence or handle that an API object owns dies with the object: keep the
   object, not only the exported fd or pointer, until the wait is done; a
   closed fd polls as ready at once (`POLLNVAL`), which looks like success.
@@ -151,6 +156,57 @@ in parentheses.
 ## Sessions
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
+
+## 2026-10-24 - Dawn beyond WebGPU: the extras, one area at a time
+
+| | |
+|---|---|
+| Session | `7a75407f-39ea-41af-b578-d4d4c430723c` |
+| When (UTC) | 2026-10-13T00:51:56+00:00 to 2026-10-24T14:00:59+00:00 |
+| Duration | 277.15 h wall clock, 10.09 h agent working |
+| Human prompts | 82 (14444 words) |
+| Subagents | 6 |
+| Model | `claude-opus-5-5` (Anthropic): 1435 requests; tokens: 3,060 input, 957,686 output, 346,549,611 cache read, 5,481,365 cache write; $123.71 at API list prices |
+| API-equivalent cost | $123.71 (estimate; see tools/session_stats.py) |
+
+(The numbers are those of the whole session, which began on 2026-10-13.)
+
+Asked: work through the audit's list on its own, exposing what wgpu-py's
+extras and Dawn offer beyond WebGPU, without waiting for review.
+
+* `b5a5b34`: all 63 of Dawn's own features in `adapter.features` (there
+  were five).
+* `3e53c88`: wgpu-py's extras that Dawn has, with wgpu-py's signatures
+  (`multi_draw_indirect` and variants, `write_timestamp`,
+  `set_instance_extras`, `request_device_sync`); Dawn's toggles per
+  instance, adapter and device; `feature_info`; memory statistics; the
+  Vulkan instance and its proc addr. A C++ layer on `dawn/native`
+  (`_lib/dawn_native.cpp`).
+* `0030803`: adapter properties (Vulkan driver and UUIDs, DRM nodes, D3D
+  shader model and LUID, memory heaps, subgroup matrices), DRM format
+  modifiers, zero-copy buffers on host memory (`host-mapped-pointer`).
+* `a37e34b`: Vulkan memory exported as an opaque fd (from another Vulkan
+  device, or CUDA) as shared texture memory.
+* `bbcef5f`: video: the multi-planar formats (NV12, P010, ...) and their
+  planes, external textures (YUV to RGB in the sampler), and the `aspect`
+  of copies and views, which the backend ignored (as wgpu-py's does).
+* `392056c`: Windows: DXGI shared handles, D3D12 resources, D3D11 textures,
+  DXGI fences, shared buffer memory, the native D3D objects; Metal's
+  scheduling wait.
+* Every extra is tested against the other API: Vulkan (a second VkDevice on
+  Dawn's instance, through ctypes), GBM dmabufs (RGBA and NV12), D3D11
+  (through COM vtables, on CI only), numpy memory under a compute shader.
+* Found by those tests: the Vulkan UUIDs were read 4 bytes off (a C++
+  struct's members in its base's tail padding); the dmabuf test used the
+  NVIDIA render node while Dawn ran on the Intel GPU, and skipped; the D3D
+  adapter properties never worked (a misspelt feature name); host memory
+  from `malloc` loses the device on Metal and D3D12 (CI).
+* A false lead, corrected before it was committed: a dmabuf that the CPU
+  filled read as zeros; it looked like the first image layout, but was the
+  plain `mmap` (not coherent here); `gbm_bo_map` is.
+* CI: runs 40097892750, 40098506801 (Windows test fixes), 40099516204 (all
+  green, website 202 ok), 40100575603 (Windows sharing). Not released: the
+  owner decides; `claude "/release"` would publish 0.32.0.1.
 
 ## 2026-10-24 - Two goals: wgpu-py, and Dawn beyond WebGPU
 
