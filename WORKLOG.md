@@ -157,6 +157,27 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-25 - The website job: a flaky `synced_video`
+
+Same session as the entries below.
+
+Asked: why the website failed on the work-log commit after 0.32.0.4.
+
+* Run 40157548256 (`2cbe40e`, only `WORKLOG.md` changed): `Website` failed
+  on `feature_demo/synced_video`. The first attempt failed after 8 s with a
+  lost device or a page that did not respond (that is what qualifies it for
+  the retry). The retry timed out after 240 s. In the four runs before, it
+  passed in 7 to 10 s. Locally, the site of that very run passes it in 4 s,
+  three times out of three.
+* Class: the checker, on the runner. The example re-uploads three 512x512
+  textures every frame at `max_fps=999`, on SwiftShader with four browsers
+  at once. It is flaky there, not broken.
+* The first error could not be read: the retry overwrote it in
+  `results.json`, and the log shows only the last line, which was the
+  example's own output. `check.mjs` now keeps the first error as `first`
+  and also logs the line that names the cause.
+* Re-ran the failed job once: `Website` and `Deploy the website` passed.
+
 ## 2026-10-24 - 0.32.0.4: the rest of shared texture memory, and CUDA
 
 Same session as the entries below.

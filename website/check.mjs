@@ -281,9 +281,14 @@ async function worker() {
   const browser = await launch();
   for (let example = queue.shift(); example; example = queue.shift()) {
     const result = await checkExample(browser, example);
+    // A second try keeps what went wrong the first time: often the real cause
+    const earlier = results[example.id];
+    if (earlier && earlier.retry && !earlier.ok) result.first = earlier.error;
     results[example.id] = result;
+    const lines = result.ok ? [] : result.error.trim().split('\n');
+    const cause = lines.find((l) => /device was lost|did not respond|Error/.test(l));
     console.log(`${result.ok ? 'ok  ' : 'FAIL'} ${example.id} (${result.seconds}s)` +
-      (result.ok ? '' : '\n      ' + result.error.split('\n').pop()));
+      (result.ok ? '' : (cause && cause !== lines.at(-1) ? '\n      ' + cause : '') + '\n      ' + lines.at(-1)));
   }
   await browser.close();
 }
@@ -297,6 +302,7 @@ const transient = (result) => result && !result.ok &&
 const again = manifest.examples.filter((e) => transient(results[e.id]));
 if (again.length) {
   console.log(`Trying ${again.length} examples with a transient failure once more, one at a time`);
+  for (const e of again) results[e.id].retry = true;
   queue.push(...again);
   await worker();
 }
