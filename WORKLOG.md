@@ -157,6 +157,43 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-24 - 0.32.0.4: the rest of shared texture memory, and CUDA
+
+Same session as the entries below.
+
+Asked: what Dawn has for sharing buffers and images (read and write), then
+"add them", with the NVIDIA GPU's Vulkan driver installed (without a
+reboot) to test CUDA.
+
+* Audit against Dawn's `webgpu.h` and the backends' `EnableFeature` calls.
+  Buffers can't be imported as shared memory on Vulkan or Metal (only on
+  D3D12), and Dawn never exports memory. For images, three options were
+  missing: D3D11's `requiresEndAccessFence`, D3D12's `isSwapchain`, and
+  Metal's commands-scheduled future. All three are now added (`d0e0c5a`).
+* Dawn rejects the D3D options on other backends, but a rejected
+  BeginAccess still holds the memory, so the next access fails too. We now
+  refuse them in Python before calling Dawn.
+* The NVIDIA Vulkan driver, installed without packages or a reboot:
+  * `apt install libnvidia-gl-610` would have moved the machine to driver
+    615 (kernel module included) while 610 is loaded.
+  * Instead, the files came from NVIDIA's 610.57.04 `.run` (checksum
+    verified), installed in `~/.local` with an ICD json there.
+  * Vulkan on NVIDIA starts through EGL, so it also needs an EGL vendor
+    file (`/usr/share/glvnd/egl_vendor.d/90_nvidia_local.json`, after
+    Mesa's).
+* New tests:
+  * CUDA and Dawn on one Vulkan image in device memory, both directions,
+    with Dawn's semaphore waited on by CUDA's stream on the GPU. Passes on
+    the 4090; `tests/cudautils.py` uses the driver API through ctypes.
+  * A host-memory buffer shared with another process.
+  * Mappable `STORAGE` buffers.
+  * The dmabuf tests now look for an adapter with a GBM backend (NVIDIA
+    has none installed here).
+* CI 40156298765: on macOS, the IOSurface test with the Metal wait passed.
+  On Windows, the DXGI test with the D3D option passed.
+* Tagged 0.32.0.4 once the test jobs were green, as the owner asked
+  (tag run started while the website job was still building).
+
 ## 2026-10-24 - 0.32.0.3: one test that needed wgpu-py
 
 Same session as the entries below.
