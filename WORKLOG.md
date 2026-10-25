@@ -157,6 +157,38 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-24 - 0.32.0.2: what conda-forge's recipe found
+
+Same session as the entries below.
+
+Asked: does conda-forge's recipe (staged-recipes#35347) need any of our
+fixes? Then: "do it, release 0.32.0.2 ahead of the pages being built".
+
+* The recipe built on all three platforms; its tests failed, each platform
+  for its own reason. Two of the reasons were ours:
+  * Linux (77 failures): no Vulkan driver in the container, and
+    `request_adapter()` gave out Dawn's Null backend adapter, which reads
+    back garbage. `enumerate_adapters()` already left it out. Now
+    `request_adapter()` raises unless `WGPU_BACKEND_TYPE=Null`.
+    `tests/conftest.py` turns "Request adapter failed" into a skip when
+    there is no adapter.
+  * The sdist had no test helpers: `MANIFEST.in` now includes `tests/*.py`
+    (not the shim).
+* Two were conda-forge's `dawn` feedstock, both CMake flags that
+  `tools/build_dawn.py` already sets:
+  * Windows: d3dcompiler_47 fails to load with error 87, so
+    `DAWN_FORCE_SYSTEM_COMPONENT_LOAD` is needed.
+  * macOS: "SPIR-V is disallowed", so `TINT_BUILD_SPV_READER` is needed.
+* Reproduced locally with `VK_ICD_FILENAMES=/nonexistent.json`.
+  * Before the fix: `Null backend via Null`.
+  * After: 66 passed, 99 skipped, no failures.
+  * From the sdist's `tests/` alone: 229 passed.
+* Released directly as 0.32.0.2 (commit `84e78e5`, CI 40147478032, tag run
+  40147928801). The owner asked not to wait for the website job, so the tag
+  went out once all the test jobs were green. No candidate first: the only
+  packaging change was the sdist's file list, which I checked by building
+  it.
+
 ## 2026-10-24 - Release 0.32.0.1: the Dawn extras
 
 Same session as the entry below (whole session, from 2026-10-13: 278.6 h
