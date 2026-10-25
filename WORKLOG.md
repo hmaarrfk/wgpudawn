@@ -157,6 +157,25 @@ in parentheses.
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
 
+## 2026-10-24 - 0.32.0.3: one test that needed wgpu-py
+
+Same session as the entries below.
+
+* The owner's conda-forge agent found the problem by reading the 0.32.0.2
+  sdist: `test_do_not_import_utils_submodules` ran `import wgpu.utils` in a
+  subprocess. That works only with the shim or wgpu-py installed, which our
+  CI always has.
+* Fixed in `0bc3500`. Verified by running the sdist's `tests/` in a venv
+  with neither the shim nor wgpu-py.
+  * 0.32.0.2: 1 failed.
+  * 0.32.0.3: 228 passed, 8 skipped.
+  * Without a GPU driver: 66 passed, 99 skipped.
+* Released as 0.32.0.3 (tag run 40149518295) once the test jobs were green,
+  without waiting for the website job, as for 0.32.0.2. PyPI's 8 hashes
+  match CI's.
+* Practice: run the sdist's tests in an environment that has neither the
+  shim nor wgpu-py. Our CI has both, so it can't catch this.
+
 ## 2026-10-24 - 0.32.0.2: what conda-forge's recipe found
 
 Same session as the entries below.
