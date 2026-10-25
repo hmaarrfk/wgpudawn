@@ -125,6 +125,21 @@ typedef struct WGPUSharedTextureMemoryVkImageLayoutEndState {
     int32_t newLayout;
 } WGPUSharedTextureMemoryVkImageLayoutEndState ;
 static const int WGPUSType_SharedTextureMemoryVkImageLayoutEndState = 0x00050028;
+typedef struct WGPUSharedTextureMemoryD3D11BeginState {
+    WGPUChainedStruct chain;
+    WGPUBool requiresEndAccessFence;
+} WGPUSharedTextureMemoryD3D11BeginState ;
+static const int WGPUSType_SharedTextureMemoryD3D11BeginState = 0x00050047;
+typedef struct WGPUSharedTextureMemoryD3DSwapchainBeginState {
+    WGPUChainedStruct chain;
+    WGPUBool isSwapchain;
+} WGPUSharedTextureMemoryD3DSwapchainBeginState ;
+static const int WGPUSType_SharedTextureMemoryD3DSwapchainBeginState = 0x00050029;
+typedef struct WGPUSharedTextureMemoryMetalEndAccessState {
+    WGPUChainedStruct chain;
+    WGPUFuture commandsScheduledFuture;
+} WGPUSharedTextureMemoryMetalEndAccessState ;
+static const int WGPUSType_SharedTextureMemoryMetalEndAccessState = 0x0005004B;
 typedef struct WGPUSharedFenceDescriptor {
     WGPUChainedStruct * nextInChain;
     WGPUStringView label;

@@ -453,6 +453,115 @@ def test_host_memory():
     run_in_subprocess(HOST_MEMORY)
 
 
+# A buffer on memory that another process maps too: the other process writes
+# the input, the GPU computes in place, the other process reads the result.
+SHARED_HOST_MEMORY = """
+    import mmap, os, subprocess, sys, tempfile
+    import numpy as np
+    extras.set_instance_extras(enable_toggles=["allow_unsafe_apis"])
+    adapter = next((a for a in wgpu.gpu.enumerate_adapters_sync()
+                    if "host-mapped-pointer" in a.features), None)
+    if adapter is None:
+        print("SKIP no adapter has host-mapped-pointer")
+        raise SystemExit
+    device = adapter.request_device_sync(required_features=["host-mapped-pointer"])
+    n = 4096  # a multiple of the alignment: whole pages
+    assert (n * 4) % extras.get_host_memory_alignment(device) == 0
+    folder = "/dev/shm" if os.path.isdir("/dev/shm") else None
+    with tempfile.TemporaryFile(dir=folder) as file:
+        file.truncate(n * 4)
+        memory = mmap.mmap(file.fileno(), n * 4)
+        buffer = extras.create_buffer_from_host_memory(device, memory, usage="STORAGE")
+        other = (
+            "import mmap, sys, numpy as np; fd, n, step = map(int, sys.argv[1:]);"
+            "a = np.frombuffer(mmap.mmap(fd, n * 4), np.uint32);"
+            "print(int((a == np.arange(n) * 2 + 1).all())) if step else a.__setitem__(slice(None), np.arange(n))"
+        )
+        run = lambda step: subprocess.run(
+            [sys.executable, "-c", other, str(file.fileno()), str(n), str(step)],
+            pass_fds=[file.fileno()], capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        run(0)
+        shader = device.create_shader_module(code='''
+            @group(0) @binding(0) var<storage, read_write> a: array<u32>;
+            @compute @workgroup_size(64)
+            fn main(@builtin(global_invocation_id) i: vec3u) { a[i.x] = a[i.x] * 2u + 1u; }
+        ''')
+        pipeline = device.create_compute_pipeline(layout="auto", compute={"module": shader})
+        bind_group = device.create_bind_group(
+            layout=pipeline.get_bind_group_layout(0),
+            entries=[{"binding": 0, "resource": {"buffer": buffer}}],
+        )
+        encoder = device.create_command_encoder()
+        compute = encoder.begin_compute_pass()
+        compute.set_pipeline(pipeline)
+        compute.set_bind_group(0, bind_group)
+        compute.dispatch_workgroups(n // 64)
+        compute.end()
+        device.queue.submit([encoder.finish()])
+        device.queue.on_submitted_work_done_sync()
+        assert run(1) == "1"
+        del buffer
+    print("OK")
+"""
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX shared memory")
+def test_host_memory_shared_with_another_process():
+    run_in_subprocess(SHARED_HOST_MEMORY)
+
+
+# A buffer that the CPU maps and shaders use, without a staging copy
+MAPPABLE_STORAGE = """
+    import numpy as np
+    extras.set_instance_extras(enable_toggles=["allow_unsafe_apis"])
+    needed = ["buffer-map-extended-usages", "buffer-map-write-extended-usages"]
+    # Dawn leaves them out on some GPUs (NVIDIA): any adapter that has them
+    adapter = next((a for a in wgpu.gpu.enumerate_adapters_sync()
+                    if all(f in a.features for f in needed)), None)
+    if adapter is None:
+        print("SKIP no adapter has", needed)
+        raise SystemExit
+    device = adapter.request_device_sync(required_features=needed)
+    n = 64
+    source = device.create_buffer(size=n * 4, usage="MAP_WRITE|STORAGE")
+    target = device.create_buffer(size=n * 4, usage="MAP_READ|STORAGE")
+    source.map_sync("WRITE")
+    source.write_mapped(np.arange(n, dtype=np.uint32).tobytes())
+    source.unmap()
+    shader = device.create_shader_module(code='''
+        @group(0) @binding(0) var<storage, read> a: array<u32>;
+        @group(0) @binding(1) var<storage, read_write> b: array<u32>;
+        @compute @workgroup_size(64)
+        fn main(@builtin(global_invocation_id) i: vec3u) { b[i.x] = a[i.x] * 3u; }
+    ''')
+    pipeline = device.create_compute_pipeline(layout="auto", compute={"module": shader})
+    bind_group = device.create_bind_group(
+        layout=pipeline.get_bind_group_layout(0),
+        entries=[
+            {"binding": 0, "resource": {"buffer": source}},
+            {"binding": 1, "resource": {"buffer": target}},
+        ],
+    )
+    encoder = device.create_command_encoder()
+    compute = encoder.begin_compute_pass()
+    compute.set_pipeline(pipeline)
+    compute.set_bind_group(0, bind_group)
+    compute.dispatch_workgroups(1)
+    compute.end()
+    device.queue.submit([encoder.finish()])
+    target.map_sync("READ")
+    result = np.frombuffer(target.read_mapped(), np.uint32)
+    target.unmap()
+    assert (result == np.arange(n) * 3).all(), result
+    print("OK")
+"""
+
+
+def test_mappable_storage_buffers():
+    run_in_subprocess(MAPPABLE_STORAGE)
+
+
 # %% Video: multi-planar formats and external textures
 
 

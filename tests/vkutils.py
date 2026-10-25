@@ -20,6 +20,8 @@ VK_FORMAT_R8G8B8A8_UNORM = 37
 VK_IMAGE_TILING_LINEAR = 1
 VK_IMAGE_USAGE = 0x1 | 0x2 | 0x4 | 0x10  # transfer src/dst, sampled, color attachment
 VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT = 0x1
+VK_IMAGE_LAYOUT_GENERAL = 1
+VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT = 0x1
 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT = 0x2
 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT = 0x4
 
@@ -310,9 +312,10 @@ class VulkanDevice:
             raise RuntimeError(f"No {name}")
         return ctypes.CFUNCTYPE(restype, *argtypes)(address)
 
-    def create_exported_image(self, width, height):
-        """A linear RGBA8 image in host-visible memory that is exported as an
-        opaque fd. Returns a dict with what Dawn's import needs."""
+    def create_exported_image(self, width, height, host_visible=True):
+        """A linear RGBA8 image in host-visible memory (or in device-local
+        memory, which only the GPU sees) that is exported as an opaque fd.
+        Returns a dict with what Dawn's import needs."""
         external = ExternalMemoryImageCreateInfo(
             sType=1000072001, handleTypes=VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT
         )
@@ -341,13 +344,15 @@ class VulkanDevice:
         wanted = (
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         )
+        if not host_visible:
+            wanted = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         for index in range(self.memory_properties.memoryTypeCount):
             flags = self.memory_properties.memoryTypes[index].propertyFlags
             if requirements.memoryTypeBits & (1 << index) and flags & wanted == wanted:
                 break
         else:
             self.destroy_image(self.device, image, None)
-            raise RuntimeError("No host-visible memory type for the image")
+            raise RuntimeError("No memory type of these properties for the image")
         dedicated = MemoryDedicatedAllocateInfo(sType=1000127001, image=image.value)
         export = ExportMemoryAllocateInfo(
             sType=1000072002,
@@ -397,6 +402,20 @@ class VulkanDevice:
             "_create_info": create_info,
             "_external": external,
         }
+
+    def export_fd(self, image):
+        """Another opaque fd of the image's memory (each import takes one)."""
+        fd_info = MemoryGetFdInfo(
+            sType=1000074002,
+            memory=image["memory"],
+            handleType=VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT,
+        )
+        fd = ctypes.c_int(-1)
+        _check(
+            self.get_fd(self.device, ctypes.byref(fd_info), ctypes.byref(fd)),
+            "vkGetMemoryFdKHR",
+        )
+        return fd.value
 
     def pixels(self, image):
         """The pixels of the image, read through the CPU: (height, width, 4) uint8."""

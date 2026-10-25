@@ -200,6 +200,9 @@ def test_io_surface_round_trip():
     assert state.initialized
     # One fence per submission; clearing uninitialized memory may be its own
     assert len(state.fences) == len(state.signaled_values) >= 1
+    # Metal tells when it has scheduled the work (before the fences signal)
+    assert state._commands_scheduled
+    assert state.wait_for_commands_scheduled(timeout=10)
 
     # Wait for the GPU through the events, then the pixels are there
     for fence, value in zip(state.fences, state.signaled_values, strict=True):
@@ -339,14 +342,35 @@ class _GbmBuffer:
         finally:
             self.gbm.gbm_bo_unmap(self.bo, data)
 
+    def close(self):
+        self.gbm.gbm_bo_destroy.argtypes = [ctypes.c_void_p]
+        self.gbm.gbm_device_destroy.argtypes = [ctypes.c_void_p]
+        self.gbm.gbm_bo_destroy(self.bo)
+        self.gbm.gbm_device_destroy(self.dev)
+        os.close(self.buffer_fd)
+        os.close(self.fd)
+
+
+def _dma_buf_adapter(needed, drm_format="AR24", bpp=4):
+    """The first adapter (in Dawn's order) with these features on whose
+    render node GBM can make a buffer of this format: not every GPU has a
+    GBM backend (NVIDIA's is a separate package)."""
+    for adapter in wgpu.gpu.enumerate_adapters_sync():
+        if not all(f in adapter.features for f in needed):
+            continue
+        try:
+            _GbmBuffer(adapter, 16, 16, drm_format, bpp).close()
+        except pytest.skip.Exception:
+            continue
+        return adapter
+    pytest.skip(f"No adapter with {needed} and a working GBM")
+
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="dmabuf is Linux")
 def test_dma_buf_round_trip():
     if not can_use_wgpu_lib:
         pytest.skip("Needs wgpu lib")
-    adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
-    if DMA_BUF not in adapter.features:
-        pytest.skip(f"Adapter lacks {DMA_BUF}")
+    adapter = _dma_buf_adapter([DMA_BUF])
     # Dawn's Vulkan device takes at most one kind of fence
     fence_feature = next(
         (f for f in (SYNC_FD, OPAQUE_FD) if f in adapter.features), None
@@ -379,6 +403,12 @@ def test_dma_buf_round_trip():
     state = memory.end_access(texture)
     assert state.initialized
     assert len(state.vk_image_layout) == 2  # what Dawn left the image in
+    assert state.wait_for_commands_scheduled(timeout=0)  # nothing to wait for
+    # The D3D options are refused before Dawn sees them: a rejected access
+    # would still hold the memory
+    for option in ({"requires_end_access_fence": False}, {"is_swapchain": True}):
+        with pytest.raises(ValueError):
+            memory.begin_access(texture, **option)
 
     if fence_feature:
         # One fence per submission; clearing uninitialized memory may be its own
@@ -491,6 +521,88 @@ def test_opaque_fd_round_trip():
         vk.close()
 
 
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="opaque fds are Linux")
+def test_opaque_fd_with_cuda():
+    # CUDA and Dawn on the same GPU share one Vulkan image in device memory
+    # (linear: CUDA sees it as rows of pitch bytes). CUDA writes, Dawn reads;
+    # Dawn writes, and CUDA reads after waiting for Dawn's semaphore on the GPU.
+    if not can_use_wgpu_lib:
+        pytest.skip("Needs wgpu lib")
+    import cudautils
+
+    cuda = cudautils.load()
+    if cuda is None:
+        pytest.skip("No CUDA driver")
+    needed = [OPAQUE_FD_MEMORY, OPAQUE_FD]
+    for adapter in wgpu.gpu.enumerate_adapters_sync():
+        uuids = extras.get_adapter_properties(adapter).get("vulkan_uuids")
+        if not uuids or not all(f in adapter.features for f in needed):
+            continue
+        try:
+            cu = cudautils.CudaDevice(cuda, uuids["device_uuid"])
+        except LookupError:
+            continue
+        break
+    else:
+        pytest.skip("No adapter with opaque fds that is also a CUDA device")
+    device = adapter.request_device_sync(required_features=needed)
+    import vkutils
+
+    vk = vkutils.VulkanDevice(device, adapter)
+    image = vk.create_exported_image(WIDTH, HEIGHT, host_visible=False)
+    pitch, offset = image["row_pitch"], image["offset"]
+    cu_memory, pointer = cu.import_memory(vk.export_fd(image), image["size"])
+    semaphore = None
+    try:
+        # CUDA writes, then waits on the CPU (no semaphore that way)
+        pixels = np.random.default_rng(0).integers(0, 256, (HEIGHT, WIDTH, 4), np.uint8)
+        rows = np.zeros((HEIGHT, pitch), np.uint8)
+        rows[:, : WIDTH * 4] = pixels.reshape(HEIGHT, -1)
+        cu.write(pointer + offset, rows)
+        cu.synchronize()
+
+        memory = extras.import_shared_texture_memory(
+            device,
+            opaque_fd={
+                "fd": image["fd"],
+                "vk_image_create_info": ctypes.addressof(image["_create_info"]),
+                "memory_type_index": image["memory_type_index"],
+                "allocation_size": image["size"],
+                "dedicated_allocation": True,
+            },
+        )
+        image["fd"] = -1  # Dawn owns it now
+        texture = memory.create_texture()
+        # The image holds data in no layout that Vulkan tracked: GENERAL
+        layout = (vkutils.VK_IMAGE_LAYOUT_GENERAL,) * 2
+        memory.begin_access(texture, initialized=True, vk_image_layout=layout)
+        data = device.queue.read_texture(
+            {"texture": texture}, {"bytes_per_row": WIDTH * 4}, (WIDTH, HEIGHT, 1)
+        )
+        assert (np.frombuffer(data, np.uint8).reshape(HEIGHT, WIDTH, 4) == pixels).all()
+
+        # Dawn writes; CUDA's stream waits on the GPU for Dawn's semaphore
+        _clear_to(device, texture, (1.0, 0.0, 0.0, 1.0))
+        state = memory.end_access(texture)
+        assert [f.type for f in state.fences] == ["vk-semaphore-opaque-fd"]
+        semaphore = cu.import_semaphore(os.dup(state.fences[0].export()["fd"]))
+        cu.wait(semaphore)
+        cu.read(pointer + offset, rows)
+        cu.synchronize()
+        assert (
+            rows[:, : WIDTH * 4].reshape(HEIGHT, WIDTH, 4) == [255, 0, 0, 255]
+        ).all()
+        del texture, memory
+    finally:
+        device.queue.on_submitted_work_done_sync()
+        if semaphore is not None:
+            cu.cuda.cuDestroyExternalSemaphore(semaphore)
+        cu.free(cu_memory, pointer)
+        vk.release(image)
+        vk.close()
+        cu.close()
+
+
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="dmabuf is Linux")
 def test_dma_buf_nv12_to_rgb():
     # A video frame as a camera or decoder would give it: NV12 in a dmabuf
@@ -499,10 +611,8 @@ def test_dma_buf_nv12_to_rgb():
     # converts it to RGB.
     if not can_use_wgpu_lib:
         pytest.skip("Needs wgpu lib")
-    adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
     needed = [DMA_BUF, "dawn-multi-planar-formats"]
-    if not all(f in adapter.features for f in needed):
-        pytest.skip(f"Adapter lacks one of {needed}")
+    adapter = _dma_buf_adapter(needed, drm_format="R8  ", bpp=1)
     fence_feature = next(
         (f for f in (SYNC_FD, OPAQUE_FD) if f in adapter.features), None
     )
@@ -647,6 +757,17 @@ def test_dxgi_shared_handle_round_trip():
                 texture, fences=[fence], signaled_values=state.signaled_values[:1]
             )
             memory.end_access(texture)
+
+        # The options of each D3D backend: D3D11 may skip the fence at the end
+        # of the access, D3D12 may treat the texture as a swapchain buffer
+        if adapter.info["backend_type"] == "D3D11":
+            memory.begin_access(texture, requires_end_access_fence=False)
+        else:
+            memory.begin_access(texture, is_swapchain=True)
+        _clear_to(device, texture, (0.0, 0.0, 1.0, 1.0))
+        memory.end_access(texture)
+        device.queue.on_submitted_work_done_sync()
+        assert (d3d.pixels(texture11, WIDTH, HEIGHT) == [0, 0, 255, 255]).all()
         del texture, memory
     finally:
         device.queue.on_submitted_work_done_sync()

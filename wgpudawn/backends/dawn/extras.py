@@ -35,6 +35,8 @@ Dawn needs on each access is tracked by the memory (``vk_image_layout`` of
 work first.
 """
 
+import itertools
+import time
 from dataclasses import dataclass, field
 
 from ..._coreutils import str_flag_to_int
@@ -50,6 +52,7 @@ from ._api import (
     new_struct_p,
     to_c_string_view,
 )
+from ._helpers import get_wgpu_instance
 from ._extras_util import _native, _check_status
 from ._extras_device import (
     all_toggles,
@@ -278,7 +281,9 @@ def import_shared_texture_memory(
         raise RuntimeError("wgpuDeviceImportSharedTextureMemory returned NULL")
     # Dawn's Vulkan backend tracks the image layout of each access
     vulkan = dma_buf is not None or opaque_fd is not None
-    return GPUSharedTextureMemory(label, id, device, vulkan=vulkan)
+    return GPUSharedTextureMemory(
+        label, id, device, vulkan=vulkan, metal=io_surface is not None
+    )
 
 
 def import_shared_fence(
@@ -350,13 +355,41 @@ class SharedTextureMemoryEndAccessState:
     ``fences`` and ``signaled_values`` go together: the GPU work on the texture
     is done when each fence has reached its value. ``vk_image_layout`` is the
     ``(old_layout, new_layout)`` of the Vulkan image for memory imported as a
-    dmabuf or an opaque fd (Vulkan), ``None`` otherwise.
+    dmabuf or an opaque fd (Vulkan), ``None`` otherwise. For memory imported
+    as an IOSurface (Metal), :meth:`wait_for_commands_scheduled` waits until
+    Metal has scheduled the work of this access.
     """
 
     initialized: bool
     fences: list = field(default_factory=list)
     signaled_values: list = field(default_factory=list)
     vk_image_layout: tuple | None = None
+    _commands_scheduled: int = 0  # the id of a WGPUFuture (Metal)
+
+    def wait_for_commands_scheduled(self, timeout=None):
+        """Metal only: wait until Metal has scheduled (not finished) the GPU
+        work of this access, e.g. before the other side encodes work that
+        waits for the fence. Returns whether it did within ``timeout``
+        seconds (``None``: no limit). Without such a signal (other backends)
+        it returns True at once.
+        """
+        if not self._commands_scheduled:
+            return True
+        wait_info = ffi.new("WGPUFutureWaitInfo *")
+        wait_info.future.id = self._commands_scheduled
+        instance = get_wgpu_instance()
+        deadline = None if timeout is None else time.perf_counter() + timeout
+        while True:
+            # In chunks of 0.1 s, so that e.g. KeyboardInterrupt comes through
+            chunk = 0.1
+            if deadline is not None:
+                chunk = max(0.0, min(chunk, deadline - time.perf_counter()))
+            libf.wgpuInstanceWaitAny(instance, 1, wait_info, int(chunk * 1e9))
+            if wait_info.completed:
+                self._commands_scheduled = 0
+                return True
+            if deadline is not None and time.perf_counter() >= deadline:
+                return False
 
 
 class GPUSharedFence(GPUObjectBase):
@@ -433,8 +466,9 @@ class GPUSharedTextureMemory(GPUObjectBase):
 
     _release_function = None  # set on first use: the native build has it
 
-    def __init__(self, label, internal, device, *, vulkan=False):
+    def __init__(self, label, internal, device, *, vulkan=False, metal=False):
         super().__init__(label, internal, device)
+        self._metal = metal
         # A dmabuf is Vulkan's: each access then carries the image layout,
         # which this object tracks from UNDEFINED through what EndAccess reports.
         self._vulkan = vulkan
@@ -524,6 +558,8 @@ class GPUSharedTextureMemory(GPUObjectBase):
         fences=(),
         signaled_values=(),
         vk_image_layout=None,
+        requires_end_access_fence=None,
+        is_swapchain=None,
     ):
         """Start using ``texture`` (made by :meth:`create_texture`) on the queue.
 
@@ -539,6 +575,13 @@ class GPUSharedTextureMemory(GPUObjectBase):
                 ``(old_layout, new_layout)`` of the Vulkan image, as ``VkImageLayout``
                 values. By default the layout that the last :meth:`end_access`
                 reported (``UNDEFINED`` at first) to ``GENERAL``.
+            requires_end_access_fence (bool): D3D11 only: whether :meth:`end_access`
+                signals a fence for this access (the default). ``False`` skips
+                the fence when the other side does not wait for one (e.g. it
+                uses the keyed mutex, or works on the same D3D11 device).
+            is_swapchain (bool): D3D12 only: the texture is a buffer of another
+                API's swapchain (e.g. one presented by a compositor), so Dawn
+                leaves it in the state that presenting needs.
         """
         if len(fences) != len(signaled_values):
             raise ValueError("fences and signaled_values must have the same length")
@@ -546,7 +589,7 @@ class GPUSharedTextureMemory(GPUObjectBase):
             "WGPUSharedFence[]", [f._internal for f in fences] or [ffi.NULL]
         )
         c_values = ffi.new("uint64_t[]", list(signaled_values) or [0])
-        chained = None
+        chain = []  # chained structs, linked below
         if self._vulkan and vk_image_layout is None:
             vk_image_layout = (self._vk_image_layout, VK_IMAGE_LAYOUT_GENERAL)
         if vk_image_layout is not None:
@@ -559,10 +602,38 @@ class GPUSharedTextureMemory(GPUObjectBase):
             chained.chain.sType = (
                 lib.WGPUSType_SharedTextureMemoryVkImageLayoutBeginState
             )
+            chain.append(chained)
+        # Dawn accepts these on D3D11 and D3D12 only. Checked here: a rejected
+        # BeginAccess still counts as an access, and the memory stays taken.
+        if requires_end_access_fence is not None or is_swapchain is not None:
+            backend = self._device.adapter.info["backend_type"]
+            if backend not in ("D3D11", "D3D12"):
+                raise ValueError(
+                    "requires_end_access_fence and is_swapchain are for D3D11 "
+                    f"and D3D12, not {backend}"
+                )
+        if requires_end_access_fence is not None:
+            chained = new_struct_p(
+                "WGPUSharedTextureMemoryD3D11BeginState *",
+                requiresEndAccessFence=bool(requires_end_access_fence),
+            )
+            chained.chain.sType = lib.WGPUSType_SharedTextureMemoryD3D11BeginState
+            chain.append(chained)
+        if is_swapchain is not None:
+            chained = new_struct_p(
+                "WGPUSharedTextureMemoryD3DSwapchainBeginState *",
+                isSwapchain=bool(is_swapchain),
+            )
+            chained.chain.sType = (
+                lib.WGPUSType_SharedTextureMemoryD3DSwapchainBeginState
+            )
+            chain.append(chained)
+        for first, second in itertools.pairwise(chain):
+            first.chain.next = ffi.cast("WGPUChainedStruct *", second)
         struct = new_struct_p(
             "WGPUSharedTextureMemoryBeginAccessDescriptor *",
-            nextInChain=ffi.cast("WGPUChainedStruct *", chained)
-            if chained
+            nextInChain=ffi.cast("WGPUChainedStruct *", chain[0])
+            if chain
             else ffi.NULL,
             concurrentRead=bool(concurrent_read),
             initialized=bool(initialized),
@@ -589,6 +660,9 @@ class GPUSharedTextureMemory(GPUObjectBase):
         if self._vulkan:
             chained = new_struct_p("WGPUSharedTextureMemoryVkImageLayoutEndState *")
             chained.chain.sType = lib.WGPUSType_SharedTextureMemoryVkImageLayoutEndState
+        elif self._metal:
+            chained = new_struct_p("WGPUSharedTextureMemoryMetalEndAccessState *")
+            chained.chain.sType = lib.WGPUSType_SharedTextureMemoryMetalEndAccessState
         state = new_struct_p(
             "WGPUSharedTextureMemoryEndAccessState *",
             nextInChain=ffi.cast("WGPUChainedStruct *", chained)
@@ -607,12 +681,14 @@ class GPUSharedTextureMemory(GPUObjectBase):
             fences.append(GPUSharedFence("", state.fences[i], self._device))
         values = [int(state.signaledValues[i]) for i in range(state.signaledValueCount)]
         layout = None
-        if chained:
+        if self._vulkan:
             layout = (int(chained.oldLayout), int(chained.newLayout))
             self._vk_image_layout = layout[1]
         result = SharedTextureMemoryEndAccessState(
             bool(state.initialized), fences, values, layout
         )
+        if self._metal:
+            result._commands_scheduled = int(chained.commandsScheduledFuture.id)
         _native("wgpuSharedTextureMemoryEndAccessStateFreeMembers")(state[0])
         return result
 

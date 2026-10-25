@@ -148,11 +148,23 @@ What there is:
   `end_access()` returns export what to wait for (an `MTLSharedEvent` and its
   value, a sync fd, an opaque-fd semaphore, or a shared `ID3D12Fence` /
   `ID3D11Fence` handle); `import_shared_fence()` goes the other way.
+  `begin_access()` takes the backend's options: the Vulkan image layout,
+  `requires_end_access_fence` (D3D11: skip the end fence) and `is_swapchain`
+  (D3D12: a buffer of another API's swapchain). On Metal, the state that
+  `end_access()` returns can `wait_for_commands_scheduled()`.
   `import_shared_buffer_memory()` does the same for buffers on Windows (a
   D3D12 resource, a shared memory handle, or host memory). Features: `shared-texture-memory-i-o-surface`,
   `shared-texture-memory-dma-buf`, `shared-fence-m-t-l-shared-event`,
   `shared-texture-memory-opaque-f-d`, `shared-fence-sync-f-d`,
   `shared-fence-vk-semaphore-opaque-f-d`.
+
+  With CUDA (Linux): a Vulkan image in device memory, exported as an opaque
+  fd, is imported by both Dawn and CUDA (`cudaImportExternalMemory`); Dawn's
+  opaque-fd semaphore goes to `cudaImportExternalSemaphore`, so CUDA's stream
+  waits for Dawn's work on the GPU. Dawn must run on Vulkan on the same GPU:
+  `get_adapter_properties(adapter)["vulkan_uuids"]["device_uuid"]` is CUDA's
+  device UUID. Dawn imports memory and does not export its own: the image is
+  made by Vulkan (or the other API), and Dawn wraps it.
 
 * **wgpu-py's extras that Dawn has**, with wgpu-py's signatures:
   `multi_draw_indirect()`, `multi_draw_indexed_indirect()` and their
@@ -186,6 +198,14 @@ What there is:
   `get_host_memory_alignment()`; `allocate_host_memory()` makes such
   memory): the GPU reads and writes it directly. Feature
   `host-mapped-pointer` (experimental; Vulkan except on AMD, Metal, D3D12).
+  The memory may be shared with another process (an `mmap` of a file in
+  `/dev/shm` or of a memfd): that process then reads what the GPU wrote,
+  and writes what it reads. On an integrated GPU this is the GPU's own
+  memory; on a discrete GPU the shader reaches it over PCIe.
+* **Mappable GPU buffers.** With `buffer-map-extended-usages` (and
+  `buffer-map-write-extended-usages`; experimental), a buffer can be both
+  `MAP_READ` (or `MAP_WRITE`) and `STORAGE`, `VERTEX`, ...: the CPU maps
+  the memory that shaders use, without a staging copy.
 
 * **Video frames: multi-planar formats and external textures.** With the
   `dawn-multi-planar-formats` feature, textures can be NV12
