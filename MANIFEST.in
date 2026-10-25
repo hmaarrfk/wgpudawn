@@ -6,6 +6,9 @@ include wgpudawn/_static_version.py
 recursive-include LICENSES *
 recursive-include wgpudawn/_lib *.h *.cpp
 recursive-include tools *.py
+# The test suite, to run against an installed wgpudawn (e.g. by conda-forge).
+# Not the wgpu shim: that is a test-only stand-in for wgpu-py, see CLAUDE.md.
+include tests/*.py
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 exclude wgpudawn/_lib/emdawn_glue.js

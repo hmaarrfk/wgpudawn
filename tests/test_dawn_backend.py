@@ -1,7 +1,10 @@
 """Tests specific to the Dawn backend (error handling, promises, lifetime)."""
 
 import gc
+import os
+import sys
 import asyncio
+import subprocess
 
 import numpy as np
 import pytest
@@ -59,10 +62,38 @@ def test_backend_is_dawn():
         "D3D11",
         "OpenGL",
         "OpenGLES",
-        "Null",
     )
     assert adapter.limits["max-bind-groups"] >= 4
     assert "core-features-and-limits" in adapter.features or adapter.features
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Vulkan only")
+def test_no_null_adapter_without_gpu():
+    # Without a driver, Dawn returns its Null backend's adapter, which does
+    # nothing: request_adapter must fail instead (so that code, and tests,
+    # see that there is no GPU), unless the Null backend is asked for.
+    code = """if True:
+        import wgpudawn as wgpu
+        assert wgpu.gpu.enumerate_adapters_sync() == []
+        try:
+            wgpu.gpu.request_adapter_sync()
+        except RuntimeError as e:
+            print("no adapter:", e)
+        """
+    env = {**os.environ, "VK_ICD_FILENAMES": "/nonexistent.json"}
+    env.pop("WGPU_BACKEND_TYPE", None)
+    for name in ("VK_DRIVER_FILES", "VK_ADD_DRIVER_FILES"):
+        env.pop(name, None)
+    p = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True)
+    assert p.returncode == 0, p.stderr.decode()
+    assert "no adapter: " in p.stdout.decode()
+    env["WGPU_BACKEND_TYPE"] = "Null"
+    code = (
+        "import wgpudawn as w; print(w.gpu.request_adapter_sync().info['backend_type'])"
+    )
+    p = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True)
+    assert p.returncode == 0, p.stderr.decode()
+    assert p.stdout.decode().split() == ["Null"]
 
 
 def test_request_device_with_features_and_limits():

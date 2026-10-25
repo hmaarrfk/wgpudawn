@@ -2,7 +2,7 @@ import sys
 import subprocess
 
 import wgpudawn as wgpu
-from testutils import run_tests
+from testutils import run_tests, can_use_wgpu_lib
 from wgpudawn.utils.device import DefaultDeviceHelper
 import pytest
 
@@ -351,6 +351,7 @@ def test_default_device_configure_required_limits(caplog):
     assert device1.limits["max-buffer-size"] >= ref2["max-buffer-size"]
 
 
+@pytest.mark.skipif(not can_use_wgpu_lib, reason="Needs wgpu lib")
 def test_default_device_and_exit_should_not_hang():
     # See https://github.com/pygfx/wgpu-py/pull/797
 

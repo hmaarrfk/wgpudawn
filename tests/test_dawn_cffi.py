@@ -15,7 +15,8 @@ def device():
 
 def test_enumerate_adapters():
     adapters = wgpu.gpu.enumerate_adapters_sync()
-    assert adapters
+    if not adapters:
+        pytest.skip("No GPU adapter")
     assert all(isinstance(a, dawn.GPUAdapter) for a in adapters)
     keys = [(a.summary, a.info["backend_type"]) for a in adapters]
     assert len(set(keys)) == len(keys)

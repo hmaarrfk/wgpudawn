@@ -570,8 +570,18 @@ class GPU(classes.GPU):
         )
 
         def handler(adapter_id):
-            return self._create_adapter(adapter_id)
+            adapter = self._create_adapter(adapter_id)
+            # Dawn's "Null" backend (in Dawn builds that have it, e.g.
+            # conda-forge's) is what Dawn returns when there is no real
+            # adapter. It does nothing; enumerate_adapters() leaves it out, so
+            # give it out only when asked for by name.
+            if adapter.info["backend_type"] == "Null" and backend != null_backend:
+                raise RuntimeError(
+                    "Request adapter failed: no GPU adapter (only Dawn's Null backend)"
+                )
+            return adapter
 
+        null_backend = enum_str2int["BackendType"]["Null"]
         promise = GPUPromise(
             "request_adapter",
             handler,
