@@ -184,7 +184,7 @@ def test_do_not_import_utils_submodules():
     assert "get_default_device" in out
 
     # Also, no numpy
-    code = "import sys, wgpu.utils; print('numpy' in sys.modules)"
+    code = "import sys, wgpudawn.utils; print('numpy' in sys.modules)"
     out = get_output_from_subprocess(code)
     assert out.strip().endswith("False"), out
 
