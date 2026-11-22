@@ -34,8 +34,8 @@ MODULE_NAME = "wgpudawn._lib._wgpu_dawn"
 
 # The Dawn release that the cdef was generated from. Native builds must link
 # against the same release (tools/build_dawn.py builds it).
-DAWN_TAG = "v20261009.190412"
-EMDAWN_ZIP_SHA256 = "639b1551ffc98ea81f748bfcf311fb3c416464408b4fc1de818c5fae6240786d"
+DAWN_TAG = "v20261120.121236"
+EMDAWN_ZIP_SHA256 = "15e946ab48abb1777aa8f0300fd00ca452292d7948d692e0a405926b646944a2"
 EMDAWN_URL = (
     f"https://github.com/google/dawn/releases/download/{DAWN_TAG}/"
     f"emdawnwebgpu_pkg-{DAWN_TAG}.zip"

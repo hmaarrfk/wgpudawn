@@ -232,9 +232,12 @@ def get_toggles(adapter_or_device):
 
 def feature_info(feature):
     """What Dawn says about a feature (a name from ``adapter.features``):
-    ``{"name": Dawn's name, "description": str, "experimental": bool}``. An
-    experimental feature is only offered with the ``allow_unsafe_apis``
-    toggle (see :func:`set_instance_extras`)."""
+    ``{"name": Dawn's name, "description": str, "experimental": bool,
+    "stable_abi": bool}``. An experimental feature (Dawn calls it unsafe) is
+    only offered with the ``allow_unsafe_apis`` toggle (see
+    :func:`set_instance_extras`). A feature without a stable C header and ABI
+    needs the ``allow_experimental_apis`` toggle, which Dawn enables by
+    default for now."""
     from ._mappings import enummap
 
     value = enummap.get(f"FeatureName.{feature}")
@@ -244,13 +247,17 @@ def feature_info(feature):
         raise KeyError(f"Unknown feature: {feature!r}")
     name = ffi.new("const char **")
     description = ffi.new("const char **")
-    experimental = ffi.new("int *")
-    if not _native("wgpu_dawn_feature_info")(value, name, description, experimental):
+    unsafe = ffi.new("int *")
+    stable_abi = ffi.new("int *")
+    if not _native("wgpu_dawn_feature_info")(
+        value, name, description, unsafe, stable_abi
+    ):
         raise KeyError(f"Dawn has no information about {feature!r}")
     return {
         "name": ffi.string(name[0]).decode(),
         "description": ffi.string(description[0]).decode(),
-        "experimental": bool(experimental[0]),
+        "experimental": bool(unsafe[0]),
+        "stable_abi": bool(stable_abi[0]),
     }
 
 

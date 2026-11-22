@@ -444,6 +444,7 @@ enum_str2int = {
         "dawn-allow-undefined-load-store-op": 327744,
         "buffer-map-write-extended-usages": 327745,
         "shared-buffer-memory-host-pointer": 327746,
+        "shared-texture-memory-d-x-g-i-y410": 327747,
     },
 }
 

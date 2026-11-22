@@ -421,6 +421,7 @@ static const int WGPUFeatureName_AdapterPropertiesDrm = 0x0005003F;
 static const int WGPUFeatureName_DawnAllowUndefinedLoadStoreOp = 0x00050040;
 static const int WGPUFeatureName_BufferMapWriteExtendedUsages = 0x00050041;
 static const int WGPUFeatureName_SharedBufferMemoryHostPointer = 0x00050042;
+static const int WGPUFeatureName_SharedTextureMemoryDXGIY410 = 0x00050043;
 static const int WGPUTextureFormat_R8BG8Biplanar420Unorm = 0x00050000;
 static const int WGPUTextureFormat_R10X6BG10X6Biplanar420Unorm = 0x00050001;
 static const int WGPUTextureFormat_R8BG8A8Triplanar420Unorm = 0x00050002;

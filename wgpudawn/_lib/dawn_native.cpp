@@ -89,8 +89,13 @@ static size_t wgpu_dawn_device_toggles(WGPUDevice device, const char** names, si
 }
 
 // Returns 0 when Dawn does not know the feature.
-static int wgpu_dawn_feature_info(
-    int feature, const char** name, const char** description, int* experimental) {
+// unsafe: needs the allow_unsafe_apis toggle. stable_abi: 0 when its C header
+// and ABI may still change, which needs allow_experimental_apis.
+static int wgpu_dawn_feature_info(int feature,
+                                  const char** name,
+                                  const char** description,
+                                  int* unsafe,
+                                  int* stable_abi) {
   const dawn::native::FeatureInfo* info =
       dawn::native::GetFeatureInfo(static_cast<wgpu::FeatureName>(feature));
   if (info == nullptr) {
@@ -98,8 +103,9 @@ static int wgpu_dawn_feature_info(
   }
   *name = info->name;
   *description = info->description;
-  *experimental =
-      info->featureState == dawn::native::FeatureInfo::FeatureState::Experimental ? 1 : 0;
+  *unsafe = info->featureSafety == dawn::native::FeatureInfo::FeatureSafety::Unsafe ? 1 : 0;
+  *stable_abi =
+      info->featureStability == dawn::native::FeatureInfo::FeatureStability::Stable ? 1 : 0;
   return 1;
 }
 

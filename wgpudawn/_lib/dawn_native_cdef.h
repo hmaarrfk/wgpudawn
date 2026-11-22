@@ -6,7 +6,7 @@ void wgpu_dawn_set_backend_validation_level(WGPUInstance instance, int level);
 size_t wgpu_dawn_all_toggles(const char ** names, const char ** descriptions, int * stages, size_t max_count);
 size_t wgpu_dawn_adapter_toggles(WGPUAdapter adapter, const char ** names, size_t max_count);
 size_t wgpu_dawn_device_toggles(WGPUDevice device, const char ** names, size_t max_count);
-int wgpu_dawn_feature_info(int feature, const char ** name, const char ** description, int * experimental);
+int wgpu_dawn_feature_info(int feature, const char ** name, const char ** description, int * unsafe, int * stable_abi);
 void wgpu_dawn_memory_usage(WGPUDevice device, uint64_t * out7);
 void wgpu_dawn_allocator_memory(WGPUDevice device, uint64_t * out4);
 int wgpu_dawn_reduce_memory_usage(WGPUDevice device);

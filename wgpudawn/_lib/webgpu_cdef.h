@@ -492,6 +492,9 @@ typedef enum WGPUSubgroupMatrixComponentType {
     WGPUSubgroupMatrixComponentType_I32 = 0x00000004,
     WGPUSubgroupMatrixComponentType_U8 = 0x00000005,
     WGPUSubgroupMatrixComponentType_I8 = 0x00000006,
+    WGPUSubgroupMatrixComponentType_Bf16 = 0x00000007,
+    WGPUSubgroupMatrixComponentType_F8_e4m3 = 0x00000008,
+    WGPUSubgroupMatrixComponentType_F8_e5m2 = 0x00000009,
     WGPUSubgroupMatrixComponentType_Force32 = 0x7FFFFFFF
 } WGPUSubgroupMatrixComponentType ;
 typedef enum WGPUSurfaceGetCurrentTextureStatus {

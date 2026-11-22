@@ -10,7 +10,7 @@
   },
   "dawn": {
     "repository": "https://github.com/google/dawn",
-    "tag": "v20261009.190412"
+    "tag": "v20261120.121236"
   },
   "pygfx": {
     "repository": "https://github.com/hmaarrfk/pygfx",
