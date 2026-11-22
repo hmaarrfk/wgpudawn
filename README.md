@@ -277,8 +277,8 @@ How it works:
 
 A version has four numbers, `X.Y.Z.N`: `X.Y.Z` is the version of wgpu-py that
 it mirrors (same API), and `N` counts the releases of wgpudawn for that
-version, which mostly are updates of Dawn. So `wgpudawn~=0.32.0` is "the API of
-wgpu-py 0.32.0, on the newest Dawn". (The first releases, `0.0.x`, predate
+version, which mostly are updates of Dawn. So `wgpudawn~=0.33.0` is "the API of
+wgpu-py 0.33.0, on the newest Dawn". (The first releases, `0.0.x`, predate
 this scheme.)
 
 The version comes from the git tag; there is no version number in the source.

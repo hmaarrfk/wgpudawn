@@ -25,7 +25,7 @@ from ._as_wgpu import install_as_wgpu
 
 # The version of wgpu-py that this version of wgpudawn mirrors: same API, and
 # the same behavior as far as the backends allow. See upstream.json in the repo.
-wgpu_py_version = "0.32.0"
+wgpu_py_version = "0.33.0"
 
 
 def _version_info(version):

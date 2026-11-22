@@ -1,8 +1,8 @@
 {
   "wgpu-py": {
     "repository": "https://github.com/pygfx/wgpu-py",
-    "version": "0.32.0",
-    "commit": "91d49ffdce645f15f8f2eb88294b9020181cb802"
+    "version": "0.33.0",
+    "commit": "77e12107abc99f14c83d09f7ce866eb9ed36bf8e"
   },
   "wgpu-py-dawn-pr": {
     "url": "https://github.com/pygfx/wgpu-py/pull/840",
