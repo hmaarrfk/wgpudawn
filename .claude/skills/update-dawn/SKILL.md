@@ -70,7 +70,15 @@ If Dawn fails to configure or build, look at what changed in its CMake options
 `get_cmake_args()` in `tools/build_dawn.py`. Keep the set of backends (Vulkan,
 Metal, D3D11/12; no OpenGL) and the SPIR-V reader. A compile error of the
 extension means the cdef and Dawn disagree: `build_cffi.py` has the C++ helper
-that uses `dawn/native/DawnNative.h`, which is not covered by the cdef.
+that uses `dawn/native/DawnNative.h` (in `wgpudawn/_lib/dawn_native.cpp`,
+declared in `dawn_native_cdef.h`), which is not covered by the cdef.
+
+Then make sure that the extension is the Dawn you just built, before you
+believe any test: `ldd wgpudawn/_lib/_wgpu_dawn.abi3.so | grep -i dawn` must
+print nothing (Dawn is linked in; the `.so` is ~13 MB, not 0.4 MB). An
+environment can have another Dawn (conda-forge's `dawn` package installs
+`libwebgpu_dawn.so`); until `build_cffi.py` linked the archive by its path,
+that one was linked instead, and a whole session of local tests ran on it.
 
 ## 3. Codegen and the backend
 
@@ -89,7 +97,11 @@ that codegen does not flag. `codegen_report.md` must not contain `ERROR`.
 Things that have changed between Dawn releases before, to look at first:
 callback signatures and `*CallbackInfo` structs, the `WGPUStringView`
 conventions, feature names (`WGPUFeatureName_*`), limits (`WGPULimits`), and
-the surface source structs for each window system.
+the surface source structs for each window system, and the structs of
+`dawn/native/DawnNative.h` that `dawn_native.cpp` reads (v20261120 split
+`FeatureInfo::featureState` into `featureSafety`, for `allow_unsafe_apis`,
+and `featureStability`, for `allow_experimental_apis`, which comes from
+`dawn_version.json`).
 
 ## 4. Verify
 

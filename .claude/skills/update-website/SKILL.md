@@ -122,7 +122,7 @@ For each example that fails, find out why, in this order:
    that an example expects in a checkout next to it (glTF-Sample-Assets) goes
    in `GLTF_SCENES`, pinned to a commit: the site serves only that scene. A
    package with C code that neither PyPI nor Pyodide has for Pyodide is
-   built by a `website/build_<name>.sh` in the `pyodide` job of CI, and named
+   built by a script like `website/build_pyav.sh` in the `pyodide` job of CI, and named
    in `built_by_import` in `pyodide.json` (PyAV with FFmpeg: `build_pyav.sh`;
    its FFmpeg configuration says which codecs and formats there are).
 3. **wgpudawn is wrong**: reproduce it natively first, where validation errors
@@ -196,6 +196,11 @@ A new Pyodide can mean a new Emscripten and platform tag
 (imgui-bundle and uharfbuzz must have a wheel for that tag on PyPI; if they do
 not, stay on the old Pyodide and report it). `tools/gen_emdawn_glue.py` must
 be run with the Emscripten of the target Pyodide, which the build does.
+
+Compare the `info` of `pyodide-lock.json` of the old and the new version
+(`https://cdn.jsdelivr.net/pyodide/v<version>/full/pyodide-lock.json`):
+the same `abi_version`, `platform` and `python` mean the same platform tag,
+and the pinned wheels stay valid (314.0.7 -> 314.0.8 was such a move).
 
 ## 6. Record, commit, deploy
 

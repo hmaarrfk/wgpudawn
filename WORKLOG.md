@@ -113,6 +113,12 @@ in parentheses.
   nothing to do with it (rendercanvas 3, a removed runner image). Watch CI
   to the end even for a one-line change. (2026-11-22)
 
+* Know which binary you tested. A local build linked a Dawn that the
+  environment happened to have, and all its tests passed; CI's test of the
+  same code failed. `ldd` (or the size of the extension) would have shown
+  it at the start. When local and CI disagree, find out which one is
+  wrong before changing the test. (2026-11-22)
+
 **Using several agents**
 
 * Parallelize by ownership of files, not by topic: one agent owned three
@@ -166,6 +172,65 @@ in parentheses.
 ## Sessions
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
+
+## 2026-11-22 - 0.33.0.0: Dawn v20261120, Pyodide 314.0.8, the infrastructure
+
+| | |
+|---|---|
+| Session | `bf6f89f1-4c7a-4691-97b8-61cc4bb268aa` |
+| When (UTC) | 2026-11-22T17:23:08+00:00 to 2026-11-22T23:01:51+00:00 |
+| Duration | 5.65 h wall clock, 1.64 h agent working |
+| Human prompts | 7 (109 words) |
+| Subagents | 0 |
+| Model | `claude-opus-5-5` (Anthropic): 258 requests; tokens: 562 input, 116,831 output, 47,259,939 cache read, 295,582 cache write; $14.16 at API list prices |
+| API-equivalent cost | $14.16 (estimate; see tools/session_stats.py) |
+
+Same session as the entry below. Asked, in order: refresh the whole project
+(Dawn, Pyodide, see whether our patches were taken upstream or replay them
+on the forks) and release to PyPI; later, the owner offered to test on iOS
+and asked for the full site to be online. A `/maintain release` run.
+
+* Dawn v20261009.190412 -> v20261120.121236 (`6a847d3`). Four new lines in
+  the cdef, all additions. `dawn::native::FeatureInfo` split `featureState`
+  into `featureSafety` (`allow_unsafe_apis`) and `featureStability` (a new
+  instance toggle `allow_experimental_apis`, enabled by default for now).
+  `extras.feature_info()` keeps `"experimental"` and adds `"stable_abi"`.
+  License texts updated (MurmurHash3 in Dawn's, `git-sync-deps` in
+  SPIRV-Tools'); the new DEPS entries are not linked.
+* Pyodide 314.0.7 -> 314.0.8, pyodide-build 0.39.4 (`69896a6`). 314.0.8 fixes
+  stack switching on iOS (pyodide#6552), which is what our `IOS_TRAMPOLINE`
+  patch and hmaarrfk/pyodide#1 did: the patch is dropped, not replayed. The
+  pygfx fork needed nothing: it is on pygfx main, and its fixes are open
+  upstream as pygfx#1348 to #1351.
+* Infrastructure: website pins (`82bd4ba`); MSVC through vswhere and
+  `vcvarsall.bat` instead of the unmaintained `ilammy/msvc-dev-cmd`
+  (`63320a8`); cibuildwheel 4.3.5 (`91afc17`). Verified on `ci/refresh`.
+* What went wrong. (1) Two jobs of run 45068226182 were cancelled with no
+  push, timeout or failed job, 14 minutes apart; re-run. (2) Every test job
+  of the branch run failed on `test_feature_info`: CI said
+  `multi-draw-indirect` has no stable ABI, the local build said it had.
+  Dawn's `dawn_version.json` agreed with CI. The local extension was
+  dynamically linked to conda-forge's `libwebgpu_dawn.so` (Dawn 20261030,
+  installed in `mcam_dev`), because the conda compilers put
+  `-L$CONDA_PREFIX/lib` before `DAWN_PREFIX`. So every local test of this
+  session, including those of the entry below, ran on that Dawn. Fixed in
+  `build_cffi.py` (`1f92879`: the archive by its path) and the test
+  (`6a445f9`); re-verified locally on the real Dawn: pytest 255 passed,
+  pygfx 393 passed, `tools/bench.py` against the released 0.32.0.4 the same
+  or up to 10% faster.
+* Released 0.33.0.0rc1 (packaging had changed: `.github`, `LICENSES`,
+  `build_cffi.py`), verified it from PyPI, then 0.33.0.0 on the same commit
+  `1f92879` (tag run 45079264169): 8 files, hashes equal to the run's
+  artifacts, a clean install finds the three adapters of this machine, pip
+  resolves a wheel for all six native platforms.
+* Site: deployed from `1f92879`, Pyodide 314.0.8, 205 of 205 examples in
+  software WebGPU. Not checked: an iPhone (the owner offered), and Chrome
+  on a GPU here (it loses the device, also with older inputs).
+* Open: drafts for issues #1 to #3 in `nogit/drafts/`; hmaarrfk/pyodide#1
+  and the branch `ios-jspi-trampoline` can be closed; Dawn will turn
+  `allow_experimental_apis` off by default (crbug.com/577079442), and then
+  the extras that chain Dawn-only structs need it enabled; the new
+  `SharedTextureMemoryDXGIY410` is a candidate extra.
 
 ## 2026-11-22 - wgpu-py v0.33.0, rendercanvas 3, pygfx main
 

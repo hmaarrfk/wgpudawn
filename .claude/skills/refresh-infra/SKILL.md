@@ -49,7 +49,10 @@ major in between. What matters here:
 * `pypa/gh-action-pypi-publish@release/v1` only runs on tags: it is tested by
   the next release, which is then a release candidate (the `release` skill
   decides that from the diff of `.github`).
-* `ilammy/msvc-dev-cmd`, `pypa/cibuildwheel` and `pypa/gh-action-pypi-publish`
+* MSVC is set up by an inline step (vswhere and `vcvarsall.bat`, in
+  `wheels.yml`), since `ilammy/msvc-dev-cmd` stopped being maintained on
+  Node 20 (November 2026).
+* `pypa/cibuildwheel` and `pypa/gh-action-pypi-publish`
   are third-party code that runs in the jobs that make and publish the
   wheels. Look at what changed between the old and the new tag
   (`gh api repos/<owner>/<action>/compare/<old>...<new> --jq '.commits[].commit.message'`)
