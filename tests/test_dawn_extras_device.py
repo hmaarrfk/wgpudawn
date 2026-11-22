@@ -59,7 +59,8 @@ def test_feature_info():
     info = extras.feature_info("multi-draw-indirect")
     assert info["name"] == "multi-draw-indirect"
     assert info["experimental"] is True
-    assert info["stable_abi"] is True
+    # Dawn-only: no "stable_version" in Dawn's dawn_version.json
+    assert info["stable_abi"] is False
     assert extras.feature_info("shader-f16")["experimental"] is False
     assert extras.feature_info("shader-f16")["stable_abi"] is True
     with pytest.raises(KeyError):
