@@ -166,6 +166,9 @@ def get_native_build_args():
     elif sys.platform == "darwin":
         kwargs["extra_compile_args"] = ["-std=c++20", "-O2", "-DNDEBUG"]
         if is_static:
+            # The archive by its path (see the Linux case below)
+            kwargs["libraries"].remove("webgpu_dawn")
+            kwargs["extra_objects"] = [os.path.join(lib_dir, "libwebgpu_dawn.a")]
             for name in (
                 "CoreFoundation",
                 "Foundation",
@@ -186,6 +189,12 @@ def get_native_build_args():
     else:
         kwargs["extra_compile_args"] = ["-std=c++20", "-O2", "-DNDEBUG"]
         if is_static:
+            # The archive by its path, not -lwebgpu_dawn: a compiler can put
+            # other directories first (conda's adds -L$CONDA_PREFIX/lib), and a
+            # libwebgpu_dawn.so there (conda-forge's dawn) would be linked
+            # instead, a different Dawn than the headers that were compiled.
+            kwargs["libraries"].remove("webgpu_dawn")
+            kwargs["extra_objects"] = [os.path.join(lib_dir, "libwebgpu_dawn.a")]
             kwargs["libraries"] += ["dl", "rt", "pthread"]
             # Don't export Dawn's symbols from the extension, and drop what is unused
             kwargs["extra_link_args"] += [
