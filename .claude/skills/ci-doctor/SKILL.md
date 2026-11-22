@@ -97,8 +97,11 @@ What this project has seen (`git log` and `WORKLOG.md` have the details):
   needs an optional feature must skip when the adapter lacks it, with the
   adapter in the reason; it must not be skipped by platform.
 * `macos-14` (Xcode 15) cannot compile Dawn ("CTAD for aggregates"); the macOS
-  wheels are built on `macos-15` with `MACOSX_DEPLOYMENT_TARGET=11.0`, and
-  `macos-14` only tests.
+  wheels are built on `macos-15` with `MACOSX_DEPLOYMENT_TARGET=11.0`.
+  GitHub removed `macos-14` in November 2026 (a job on it is cancelled within
+  seconds, with no steps and the annotation "The configuration
+  'macos-14-arm64-us-default' is not supported"); the tests run on `macos-15`
+  and `macos-26`.
 * The pygfx job: `ValueError: option names {'--regenerate-screenshots'} already
   added`: pytest loaded our `conftest.py` and the one of pygfx (its checkout is
   inside ours). That is what `--confcutdir=$PWD` is for.
