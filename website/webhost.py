@@ -112,8 +112,7 @@ def setup(knows, load, blocking=True):
 
     wgpudawn.install_as_wgpu()  # pygfx and rendercanvas import wgpu by name
     _size_at_once()
-    if blocking:
-        _paint_can_block()
+    _paint_per_frame(blocking)
 
 
 def _size_at_once():
@@ -150,25 +149,35 @@ def _size_at_once():
     backend.PyodideRenderCanvas._final_canvas_init = _final_canvas_init
 
 
-def _paint_can_block():
-    """A draw callback can use the blocking API of wgpu, as on a desktop.
+def _paint_per_frame(blocking):
+    """Paint once per animation frame of the browser, and let a paint block.
 
-    rendercanvas draws in an animation frame of the browser, which calls
-    Python without a stack that can be suspended (JSPI). So a draw that waits
-    for the GPU (reading back a texture, such as drawing an offscreen canvas,
-    or picking) fails there. ``callPromising`` gives the call such a stack.
+    rendercanvas 3 chains every paint on one promise that the canvas makes
+    when it is created. Once that has resolved (at the first frame), a paint
+    runs as a microtask as soon as it is asked for, not at an animation
+    frame. Without blocking, a heavy scene then loses the GPU device in
+    software WebGPU (feature_demo/gltf_viewer with --no-blocking), which it
+    does not with rendercanvas 2. So each paint waits for an animation frame
+    here, as it did in rendercanvas 2.
+
+    Where Python can block, a draw callback can use the blocking API of
+    wgpu, as on a desktop. An animation frame calls Python without a stack
+    that can be suspended (JSPI), so a draw that waits for the GPU (reading
+    back a texture, such as drawing an offscreen canvas, or picking) fails
+    there. ``callPromising`` gives the call such a stack.
     """
     from js import window
     from pyodide.ffi import create_proxy
     from rendercanvas import pyodide as backend
 
     def _rc_request_paint(self):
-        paint = getattr(self, "_paint_promising", None)
-        if paint is None:
-            paint = create_proxy(self._time_to_paint).callPromising
-            self._paint_promising = paint
-            self._paint_frame = create_proxy(lambda _: paint())
-        window.requestAnimationFrame(self._paint_frame)
+        frame = getattr(self, "_paint_frame", None)
+        if frame is None:
+            paint = create_proxy(self._time_to_paint)
+            if blocking:
+                paint = paint.callPromising
+            frame = self._paint_frame = create_proxy(lambda _: paint())
+        window.requestAnimationFrame(frame)
 
     backend.PyodideRenderCanvas._rc_request_paint = _rc_request_paint
 

@@ -229,9 +229,7 @@ jobs:
         pip install dist/*.whl
         # Not shipped; takes the place of wgpu-py so that `import wgpu` is wgpudawn
         pip install ./tests/wgpu_shim
-        # The pinned pygfx calls canvas.is_closed(), which rendercanvas 3 removed
-        # (pygfx#1334 fixed it). Drop this pin when the pygfx pin moves past it.
-        pip install "./pygfx-src[tests]" "rendercanvas<3"
+        pip install "./pygfx-src[tests]"
         pip list
     - name: Check that pygfx runs on wgpudawn
       run: |

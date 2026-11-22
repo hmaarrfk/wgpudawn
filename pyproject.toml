@@ -38,9 +38,9 @@ tests = [
     "imageio",
     "anyio",
     "trio",
-    "rendercanvas>=2.4.0",
+    "rendercanvas>=3.0.1",
 ]
-examples = ["pypng", "rendercanvas", "glfw", "imgui_bundle"]
+examples = ["pypng", "rendercanvas>=3.0.1", "glfw", "imgui_bundle"]
 dev = ["wgpudawn[codegen,lint,tests,examples]"]
 
 [project.entry-points."pyinstaller40"]

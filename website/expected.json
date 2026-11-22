@@ -104,6 +104,7 @@
  "feature_demo/skybox",
  "feature_demo/skybox_rotate",
  "feature_demo/spheres",
+ "feature_demo/stencil_outline",
  "feature_demo/synced_video",
  "feature_demo/text_align",
  "feature_demo/text_big",
@@ -188,6 +189,7 @@
  "validation/validate_send_data",
  "validation/validate_skybox",
  "validation/validate_srgb",
+ "validation/validate_stencil_layers",
  "validation/validate_streamed_blending",
  "validation/validate_text_align",
  "validation/validate_text_anchor",
@@ -198,6 +200,7 @@
  "validation/validate_tiny_image",
  "validation/validate_transform",
  "validation/validate_view_offset",
+ "validation/validate_viewport_offset",
  "validation/validate_volume",
  "validation/validate_volume_ray_cam_sign",
  "validation/validate_volume_slice"
