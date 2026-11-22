@@ -103,6 +103,16 @@ in parentheses.
   `check.mjs --warm`, which reports click-to-first-frame for every example and
   fails when warm and cold disagree. (2026-10-12)
 
+* Before blaming the new version of a dependency, run the old one in the same
+  harness: the device losses on the GPU and the failing warm walk looked like
+  rendercanvas 3, and happened with 2.7.2 too; the one real regression
+  (`gltf_viewer` without blocking) showed only in that comparison.
+  (2026-11-22)
+* A "nothing to port" release still moves the world around it: wgpu-py
+  v0.33.0 was a version bump, but CI was red for two reasons that had
+  nothing to do with it (rendercanvas 3, a removed runner image). Watch CI
+  to the end even for a one-line change. (2026-11-22)
+
 **Using several agents**
 
 * Parallelize by ownership of files, not by topic: one agent owned three
@@ -156,6 +166,62 @@ in parentheses.
 ## Sessions
 
 <!-- Newest first. `python tools/session_stats.py --markdown` makes the header. -->
+
+## 2026-11-22 - wgpu-py v0.33.0, rendercanvas 3, pygfx main
+
+| | |
+|---|---|
+| Session | `bf6f89f1-4c7a-4691-97b8-61cc4bb268aa` |
+| When (UTC) | 2026-11-22T17:23:08+00:00 to 2026-11-22T20:06:16+00:00 |
+| Duration | 2.72 h wall clock, 0.72 h agent working |
+| Human prompts | 5 (59 words) |
+| Subagents | 0 |
+| Model | `claude-opus-5-5` (Anthropic): 123 requests; tokens: 270 input, 45,539 output, 12,827,178 cache read, 137,404 cache write; $4.58 at API list prices |
+| API-equivalent cost | $4.58 (estimate; see tools/session_stats.py) |
+
+Asked, in order: port the new wgpu-py release; (then) install what is
+needed in the local environment; make wgpudawn work with rendercanvas 3;
+requiring rendercanvas 3.0.1, moving pygfx and rebasing the fork are fine;
+does it work now.
+
+* wgpu-py v0.33.0 (77e1210) is the mirrored 0.32.0 commit plus the version
+  bump: nothing to port, only the recorded versions (`ce80520`).
+* The machine had no dev environment (no `../.env`, Dawn prefix or built
+  extension); the first verification was left to CI. With permission, Dawn
+  v20261009.190412 was built into `../dawn-prefix` and wgpudawn, the shim
+  and pygfx installed editable in the `mcam_dev` conda environment.
+* CI run 45049236698 was red for two reasons unrelated to the port. The
+  pygfx job broke on rendercanvas 3.0 (released 2026-11-06), which removed
+  `canvas.is_closed()`, still used by the pinned pygfx. It was pinned
+  `rendercanvas<3` first (`7bc9a2e`). And GitHub removed `macos-14`: the job
+  is cancelled within seconds with "The configuration
+  'macos-14-arm64-us-default' is not supported", so the tests now run on
+  `macos-15` and `macos-26` (`25e1a4d`, run 45056528362 green).
+* rendercanvas 3 (`b5c5c60`): wgpudawn needed no code change. A new test
+  awaits GPUPromises, sleep and Event in tasks of the raw, asyncio and trio
+  loops. `rendercanvas>=3.0.1` is required in the extras. The fork branch
+  `hmaarrfk/pygfx` `webgpu-portability` was rebased onto pygfx main
+  27a0692: 7 commits, with one already upstream and a commit/revert pair
+  dropped. Its old head was kept as `webgpu-portability-2026-10-25`. The
+  website moved to rendercanvas 3.0.1. With `--no-blocking`,
+  `gltf_viewer` lost the device, because rendercanvas 3 paints as a
+  microtask, not at an animation frame. `webhost.py` now paints at an
+  animation frame in both modes. Three new pygfx examples work and were
+  added to `expected.json`.
+* Verified: pytest 255 passed; pygfx's tests on wgpudawn 393 passed; site
+  205/205 (software); `--no-blocking` the same 5 failures as rendercanvas
+  2.7.2. CI run 45064494075 is green on all jobs, and the deployed site
+  serves rendercanvas 3.0.1 and runs `gltf_viewer`.
+* Wrong turns: the first probe of the rendercanvas loops failed because a
+  loop without a canvas cancels its tasks (rendercanvas 3), not because of
+  wgpudawn. A check that seemed to hang was retrying the 202 failures of
+  the previous `results.json` one by one.
+* Open: on this machine, Chrome on the GPU loses the device for every
+  example (also with rendercanvas 2.7.2). So the warm walk and the gallery
+  pictures (none yet for the three new examples) need a run on another
+  GPU machine. Still due: Dawn (25 releases behind), Pyodide 314.0.8, other
+  pins, `ilammy/msvc-dev-cmd` on an old Node, issues #2 and #3. A release
+  0.33.0.0 waits for the owner: `claude "/release 0.33.0.0"`.
 
 ## 2026-10-25 - The website job: a flaky `synced_video`
 

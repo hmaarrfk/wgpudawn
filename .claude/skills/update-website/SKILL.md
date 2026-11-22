@@ -99,7 +99,12 @@ WebGPU, where Chrome loses the device about a second after an example starts
 drawing and the canvas stays black. "ok" there means "started and reported no
 error until then"; the run on a GPU is the stronger statement. Run it that
 way too before pushing.) `--failed` re-runs only what failed; `--only <text>` one
-example. To watch one: `python -m http.server -d ../site 8765` and open
+example. Every run (also with `--only`) first retries, one at a time, the
+examples that failed in the `results.json` of the site: after a run with
+many failures that takes long and looks like a hang, so delete
+`results.json` before a new check. The warm walk is meaningful only on a
+GPU: in software, Chrome loses the device after about a second, also with
+inputs that work. To watch one: `python -m http.server -d ../site 8765` and open
 `http://localhost:8765/run.html?ex=<category>/<name>`.
 
 ## 3. Deal with every failure
