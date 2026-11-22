@@ -113,9 +113,24 @@ jobs:
       run: tools/build_dawn_manylinux.sh "$DAWN_PREFIX"
     - name: Set up MSVC
       if: runner.os == 'Windows'
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: ${{ matrix.msvc_arch }}
+      shell: pwsh
+      # What ilammy/msvc-dev-cmd did (it is unmaintained, on Node 20): run
+      # vcvarsall.bat and keep the variables that it sets or changes
+      run: |
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $vs = & $vswhere -latest -products * -property installationPath
+        if (-not $vs) { throw "No Visual Studio found" }
+        $vcvars = Join-Path $vs "VC\Auxiliary\Build\vcvarsall.bat"
+        $lines = cmd /c "`"$vcvars`" ${{ matrix.msvc_arch }} >nul && set"
+        if ($LASTEXITCODE -ne 0) { throw "vcvarsall.bat ${{ matrix.msvc_arch }} failed" }
+        foreach ($line in $lines) {
+          if ($line -match '^([^=]+)=(.*)$') {
+            $name, $value = $matches[1], $matches[2]
+            if ([Environment]::GetEnvironmentVariable($name) -ne $value) {
+              "$name=$value" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+        }
     - name: Build Dawn (macOS, Windows)
       if: steps.dawn-cache.outputs.cache-hit != 'true' && runner.os != 'Linux'
       shell: bash
