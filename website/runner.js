@@ -69,8 +69,7 @@ export function supportsJSPI() {
 
 // Whether Python can wait for the browser in the middle of a call (the
 // blocking API of wgpu: reading back a buffer, picking). That takes JSPI.
-// (In Safari on iOS it also takes the Pyodide that build.py patches: see
-// IOS_TRAMPOLINE there.) ?jspi=0 runs the examples as a browser without it
+// (In Safari on iOS also Pyodide 314.0.8 or newer.) ?jspi=0 runs the examples as a browser without it
 // does: the device is awaited before the example starts, and what must block
 // raises an error.
 export function canBlock() {

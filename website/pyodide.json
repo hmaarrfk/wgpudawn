@@ -1,6 +1,6 @@
 {
-  "version": "314.0.7",
-  "url": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/",
+  "version": "314.0.8",
+  "url": "https://cdn.jsdelivr.net/pyodide/v314.0.8/full/",
   "packages": [
     "cffi",
     "numpy",

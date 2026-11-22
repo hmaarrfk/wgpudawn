@@ -302,21 +302,11 @@ def normalize(name):
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-# CPython calls C functions through a trampoline. Where it thinks it is on iOS
-# it uses one written in JavaScript (a workaround for a WebKit bug in iOS
-# 18.3.1), and WebAssembly cannot suspend through a JavaScript frame: in
-# Safari on an iPhone the first pyodide.ffi.run_sync was a fatal error
-# ("SuspendError: JavaScript frames found between WebAssembly.Suspending and
-# WebAssembly.promising"). A browser that has JSPI gets the WebAssembly
-# trampoline here. See https://github.com/hmaarrfk/wgpudawn/issues/1
-IOS_TRAMPOLINE = (
-    "if(isIOS){return 0}",
-    'if(isIOS&&typeof WebAssembly.Suspending!=="function"){return 0}',
-)
-
-
 def host_pyodide(out, pyodide, cache_dir):
-    """The core of Pyodide, served by the site, with ``IOS_TRAMPOLINE`` applied.
+    """The core of Pyodide, served by the site.
+
+    (It was served here to patch its call trampoline for Safari on iOS, which
+    Pyodide 314.0.8 fixed: pyodide/pyodide#6552, wgpudawn issue 1.)
 
     The packages of the distribution still come from where it is published.
     Returns the directory, relative to the site.
@@ -334,13 +324,6 @@ def host_pyodide(out, pyodide, cache_dir):
         )
         with open(path, "rb") as f:
             files[name] = f.read()
-    before, after = (text.encode() for text in IOS_TRAMPOLINE)
-    if files["pyodide.asm.mjs"].count(before) != 1:
-        raise SystemExit(
-            "pyodide.asm.mjs does not have the iOS trampoline check as expected: "
-            "see IOS_TRAMPOLINE in website/build.py (a newer Pyodide may not need it)"
-        )
-    files["pyodide.asm.mjs"] = files["pyodide.asm.mjs"].replace(before, after)
     name = "pyodide-{}-{}".format(
         pyodide["version"], digest(b"".join(files[k] for k in sorted(files)))
     )
