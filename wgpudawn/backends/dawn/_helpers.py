@@ -3,6 +3,7 @@
 import sys
 import time
 import types
+import collections
 import threading
 import ctypes
 import inspect
@@ -391,6 +392,20 @@ class EventPump:
         self._lock = threading.Lock()
         self._promises = set()
         self._thread = None
+        # Releases that the garbage collector ran on the pump's thread: they
+        # wait here for process_events() on the loop's thread (see on_thread).
+        self.deferred = collections.deque()
+        self._local = threading.local()
+
+    def on_thread(self):
+        """Whether this is the pump's thread, which must not call into Dawn.
+
+        Any allocation can start the garbage collector, also on this thread,
+        and a ``__del__`` would then release a Dawn object here, while the
+        loop's thread may be inside Dawn (in CI: a device released here during
+        ``wgpuInstanceProcessEvents`` there, which aborted).
+        """
+        return getattr(self._local, "pump", False)
 
     def add(self, promise):
         if promise._call_soon_threadsafe is None:
@@ -402,6 +417,7 @@ class EventPump:
                 self._thread.start()
 
     def _run(self):
+        self._local.pump = True
         sleep_gen = get_backoff_time_generator()
         while True:
             with self._lock:

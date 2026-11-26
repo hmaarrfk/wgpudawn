@@ -766,6 +766,9 @@ gpu = GPU()
 
 def process_events():
     """Let Dawn call the callbacks of completed async operations (native only)."""
+    deferred = _event_pump.deferred
+    while deferred:
+        deferred.popleft()()
     # H: void f(WGPUInstance instance)
     libf.wgpuInstanceProcessEvents(get_wgpu_instance())
 
@@ -1226,6 +1229,9 @@ class GPUCanvasContext(classes.GPUCanvasContext):
             logger.warning("wgpuSurfacePresent failed")
 
     def _release(self):
+        if _event_pump.on_thread():
+            _event_pump.deferred.append(self._release)
+            return
         self._drop_texture()
         if self._surface_id is not None and libf is not None:
             self._surface_id, surface_id = None, self._surface_id
@@ -1236,6 +1242,9 @@ class GPUCanvasContext(classes.GPUCanvasContext):
 
 class GPUObjectBase(classes.GPUObjectBase):
     def _release(self):
+        if self._internal is not None and _event_pump.on_thread():
+            _event_pump.deferred.append(self._release)
+            return
         if self._internal is not None and libf is not None:
             self._internal, internal = None, self._internal
             # H: void wgpuDeviceRelease(WGPUDevice device)

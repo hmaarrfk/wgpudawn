@@ -478,3 +478,26 @@ def test_aspects_of_views_and_copies():
     device.queue.submit([encoder.finish()])
     data = np.frombuffer(device.queue.read_buffer(buffer), np.uint8).reshape(4, 256)
     assert (data[:, :4] == 7).all()
+
+
+def test_release_on_the_event_pump_thread_is_deferred(device):
+    # The garbage collector can run a __del__ on the event pump's thread, while
+    # the loop's thread is inside Dawn: the release must wait for that thread.
+    import threading
+    from wgpudawn.backends.dawn._api import _event_pump
+
+    buffer = device.create_buffer(size=16, usage=wgpu.BufferUsage.COPY_DST)
+
+    def as_the_pump():
+        _event_pump._local.pump = True
+        buffer._release()
+
+    thread = threading.Thread(target=as_the_pump)
+    thread.start()
+    thread.join()
+    assert buffer._internal is not None
+    assert len(_event_pump.deferred) == 1
+
+    dawn.process_events()
+    assert buffer._internal is None
+    assert not _event_pump.deferred
