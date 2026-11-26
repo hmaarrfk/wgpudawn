@@ -31,6 +31,8 @@ EXAMPLES = ROOT + "/examples"
 STORE = ROOT + "/store"
 IMAGE_STORE = ROOT + "/images"
 IMAGES = "/imageio/.imageio/images"  # imageio's user directory
+# What pygfx requires on every device (pygfx/renderers/wgpu/engine/shared.py)
+PYGFX_DEFAULT_FEATURES = {"float32-filterable", "depth32float-stencil8"}
 
 _placed = set()  # data entries that are in EXAMPLES now
 _images = set()  # sample images that are in IMAGES now
@@ -214,7 +216,20 @@ async def warm():
         if adapter is None:
             adapter = await wgpudawn.gpu.request_adapter_async(**helper._adapter_kwargs)
         kwargs = helper._device_kwargs.copy()
-        required = kwargs.get("required_features", set())
+        required = set(kwargs.get("required_features", set()))
+        # pygfx requires these on every device, but many phone GPUs (Mali,
+        # older Adreno) lack float32-filterable: without them no example would
+        # start. Most examples do not need them; one that does fails by itself.
+        missing = {
+            f for f in PYGFX_DEFAULT_FEATURES & required if f not in adapter.features
+        }
+        if missing:
+            print(
+                f"This GPU does not have {', '.join(sorted(missing))}, which pygfx "
+                "asks for by default; going on without (some examples may fail).",
+                file=sys.stderr,
+            )
+            required -= missing
         extra = kwargs.pop("preferred_features", set()) & adapter.features
         kwargs["required_features"] = required | extra
         helper._the_device = await adapter.request_device_async(**kwargs)
