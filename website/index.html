@@ -13,6 +13,11 @@
 <link rel="modulepreload" href="app.js">
 <link rel="modulepreload" href="runner.js">
 <link rel="preload" href="examples.json" as="fetch" crossorigin>
+<script>
+// WebGPU exists only in secure contexts: over http:// navigator.gpu is
+// undefined. GitHub Pages serves this site on both, so move to https.
+if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) location.replace('https:' + location.href.slice(5));
+</script>
 </head>
 <body class="home">
 <script>

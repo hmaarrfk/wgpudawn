@@ -454,7 +454,8 @@ function openExample(example, how) {
   }
   if (!webgpu) {
     say('Loading', 'busy', '');
-    fail('This browser does not have WebGPU. Try a recent Chrome or Edge.', '',
+    fail(window.isSecureContext ? 'This browser does not have WebGPU. Try a recent Chrome or Edge.'
+      : 'WebGPU needs a secure page: open this address with https://.', '',
       'The example draws with the WebGPU of the browser, through Dawn.');
     return;
   }
@@ -631,7 +632,7 @@ function buildGallery() {
     + `Python runs in Pyodide ${manifest.pyodide.version}, in this page.`;
 
   if (!webgpu) {
-    $('browser').textContent = 'This browser does not have WebGPU, so the examples cannot run here: you are looking at screenshots. Recent versions of Chrome and Edge have it.';
+    $('browser').textContent = !window.isSecureContext ? 'This page was loaded over http://, where browsers do not offer WebGPU, so the examples cannot run here: open it with https://.' : 'This browser does not have WebGPU, so the examples cannot run here: you are looking at screenshots. Recent versions of Chrome and Edge have it.';
   } else if (!jspi) {
     $('browser').textContent = 'This browser has WebGPU, but not JSPI (WebAssembly stack switching), so Python cannot wait for the browser in the middle of a call. Examples that only draw run; those that read back from the GPU, such as picking, do not. Recent versions of Chrome, Edge and Safari have both.';
   }

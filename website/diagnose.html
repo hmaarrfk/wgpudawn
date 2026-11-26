@@ -26,6 +26,11 @@
   .actions button.primary { background: var(--accent, #f28c28); color: #fff; border-color: transparent; font-weight: 600; }
   #report { width: 100%; min-height: 220px; font: 12px/1.45 ui-monospace, monospace; padding: 12px; border-radius: 10px; border: 1px solid var(--line, #8884); background: transparent; color: inherit; box-sizing: border-box; }
 </style>
+<script>
+// WebGPU exists only in secure contexts: over http:// navigator.gpu is
+// undefined. GitHub Pages serves this site on both, so move to https.
+if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) location.replace('https:' + location.href.slice(5));
+</script>
 </head>
 <body>
 <main class="diag">
